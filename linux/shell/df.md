@@ -2,8 +2,6 @@
 -l, --local        只显示本机的文件系统
 
 
-
-
     df --help
     用法：df [选项]... [文件]...
     Show information about the file system on which each FILE resides,
