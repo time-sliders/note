@@ -14,15 +14,15 @@ tar -xvf jdk-8u201-linux-x64.tar.gz -C /usr/local
 export JAVA_HOME=/usr/local/jdk1.8.0_201/
 export PATH=$PATH:$JAVA_HOME/bin/
 
-### 添加 tomcat 用户
-#### 添加用户 tomcat
+### 添加tomcat用户
+#### 添加用户tomcat
 useradd -d /home/tomcat -s /usr/sbin/nologin tomcat
 #### 添加用户组
 groupadd tomcat
 #### 将用户 tomcat 添加到组 tomcat
 gpasswd -a tomcat tomcat
 
-### 安装 tomcat
+### 安装tomcat
 cd /usr/local/volume
 tar -xvf apache-tomcat-8.5.32.tar.gz -C /home/tomcat
 export TOMCAT_HOME=/home/tomcat/apache-tomcat-8.5.32/
