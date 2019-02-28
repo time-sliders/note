@@ -18,7 +18,7 @@ Kubernetes master 负责维护集群的所需状态。当需要与 Kubernetes �
 
 2. Kubernetes Scheduler：为新建立的Pod进行节点(node)选择(即分配机器)，负责集群的资源调度。组件抽离，可以方便替换成其他调度器；
 
-3. Kubernetes Controller：负责执行各种控制器，目前已经提供多种控制器来保证Kubernetes的正常运行。
+3. Kubernetes Controller：负责执行各种控制器，目前已经提供多种控制器来保证Kubernetes的正常运行。  
     ![K8sController](ref/k8s_01.png)
     
 ### Kubernetes-Node
@@ -28,7 +28,7 @@ Kubernetes集群中的 node 是运行应用程序和云工作流的机器（虚�
 
 2. Kube-proxy：负责为Pod创建代理服务，Kubernetes Proxy会从Kubernetes API Server获取所有的Service信息，并根据Service的信息创建代理服务，实现Service到Pod的请求路由和转发，从而实现Kubernetes层级的虚拟转发网络，用于实现Kubernetes的service机制。kuber-proxy可提供一部分SDN功能以及集群内部的智能LoadBalancer(默认通过内核iptables实现)；
 
-3. Docker：Node上需要运行容器服务。
+3. Docker：Node上需要运行容器服务。  
     ![NodeWithDocker](ref/k8s_02.png)
     
 ## Kubernetes-Etcd

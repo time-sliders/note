@@ -1,11 +1,11 @@
-k8s.gcr.io/kube-apiserver:v1.13.2  
-k8s.gcr.io/kube-controller-manager:v1.13.2  
-k8s.gcr.io/kube-scheduler:v1.13.2  
-k8s.gcr.io/kube-proxy:v1.13.2  
-k8s.gcr.io/pause:3.1  
-k8s.gcr.io/etcd:3.2.24  
-k8s.gcr.io/coredns:1.2.6  
-**Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)**
+    k8s.gcr.io/kube-apiserver:v1.13.2  
+    k8s.gcr.io/kube-controller-manager:v1.13.2  
+    k8s.gcr.io/kube-scheduler:v1.13.2  
+    k8s.gcr.io/kube-proxy:v1.13.2  
+    k8s.gcr.io/pause:3.1  
+    k8s.gcr.io/etcd:3.2.24  
+    k8s.gcr.io/coredns:1.2.6  
+    **Get https://k8s.gcr.io/v2/: net/http: request canceled while waiting for connection (Client.Timeout exceeded while awaiting headers)**
 
 ### docker.io仓库对google的容器做了镜像，可以通过下列命令下拉取相关镜像
 `docker pull mirrorgooglecontainers/kube-apiserver:v1.13.2`  
