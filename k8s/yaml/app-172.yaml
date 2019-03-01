@@ -1,0 +1,103 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: app-deploy-172
+  namespace: xxx-172
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: app-172
+  template:
+    metadata:
+      labels:
+        app: app-172
+    spec:
+      nodeSelector:
+        env: online-172
+      containers:
+      - name: app
+        image: harbor.company.org/company-online/app:20190301
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+        resources:
+          limits:
+            #cpu: 1000m
+            memory: 6Gi
+          requests:
+            #cpu: 200m
+            memory: 4Gi
+        livenessProbe:
+          httpGet:
+            path: /status.jsp
+            port: 8080
+            scheme: HTTP
+          initialDelaySeconds: 100
+          periodSeconds: 10
+          successThreshold: 1
+          timeoutSeconds: 3
+          failureThreshold: 10
+        readinessProbe:
+          httpGet:
+            path: /status.jsp
+            port: 8080
+            scheme: HTTP
+          periodSeconds: 10
+          successThreshold: 2
+          timeoutSeconds: 3
+          failureThreshold: 5
+        env:
+        - name: DISCONF_CONF_SERVER_HOST
+          value: "disconf.xxx.org"
+        - name: DISCONF_APP
+          value: "app"
+        - name: DISCONF_ENV
+          value: "online_172"
+        - name: DISCONF_VERSION
+          value: "1_0_0_0"
+        - name: TOMCAT_PORT
+          value: "8080"
+        - name: SET_JVM_Xms
+          value: "4096m"
+        - name: SET_JVM_Xmx
+          value: "4096m"
+        - name: SET_JVM_Xmn
+          value: "2048m"
+        - name: SET_JVM_Xss
+          value: "256k"
+        volumeMounts:
+          - name: localtime
+            mountPath: /etc/localtime
+            readOnly: true
+          - name: logs
+            mountPath: /data/www/logs/apps
+      volumes:
+      - name: localtime
+        hostPath:
+          path: /etc/localtime
+      - name: logs
+        hostPath:
+          path: /data/www/logs/apps
+      hostAliases:
+      - ip: "172.16.1.1"
+        hostnames:
+        - "app.company.com"
+
+---
+        
+apiVersion: v1
+kind: Service
+metadata:
+  name: app-svc-172
+  namespace: xxx-172
+  labels:
+    app: app-172
+spec:
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+  selector:
+    app: app-172
+

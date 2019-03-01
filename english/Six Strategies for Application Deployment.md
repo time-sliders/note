@@ -14,7 +14,6 @@ Let’s take a look at each strategy and see which strategy would fit best for a
 
 # Recreate
 The recreate strategy is a dummy笨蛋 deployment which consists of shutting down version A then deploying version B after version A is turned off. This technique implies意味着 downtime of the service that depends on both shutdown and boot duration of the application.
-![recreate](ref/recreate.gif)
 Pros:
 * Easy to setup.
 * Application state entirely renewed.
@@ -27,7 +26,6 @@ Depending on the system taking care of the ramped deployment, you can tweak稍�
 * Parallelism, max batch size: Number of concurrent instances to roll out.
 * Max surge浪涌: How many instances to add in addition of the current amount.
 * Max unavailable: Number of unavailable instances during the rolling update procedure.
-![recreate](ref/ramped.gif)
 Pros:
 * Easy to set up.
 * Version is slowly released across instances.
@@ -39,7 +37,6 @@ Cons:
 
 # Blue/Green
 The blue/green deployment strategy differs from a ramped deployment, version B (green) is deployed alongside version A (blue) with exactly the same amount of instances. After testing that the new version meets all the requirements the traffic is switched from version A to version B at the load balancer level.
-![recreate](ref/blue_green.gif)
 Pros:
 * Instant瞬间 rollout/rollback.
 * Avoid versioning issue, the entire application state is changed in one go.
@@ -51,7 +48,6 @@ Cons:
 # Canary
 A canary deployment consists of gradually shifting production traffic from version A to version B. Usually the traffic is split based on weight. For example, 90 percent of the requests go to version A, 10 percent go to version B.
 This technique is mostly used when the tests are lacking or not reliable or if there is little confidence about the stability of the new release on the platform.
-![recreate](ref/canary.gif)
 Pros:
 * Version released for a subset of users.
 * Convenient for error rate and performance monitoring.
@@ -68,7 +64,6 @@ Here is a list of conditions that can be used to distribute traffic amongst the 
 * Geolocalisation地理定位
 * Technology support: browser version, screen size, operating system, etc.
 * Language
-![recreate](ref/ABtest.gif)
 Pros:
 * Several versions run in parallel.
 * Full control over the traffic distribution.
@@ -79,7 +74,6 @@ Cons:
 # Shadow
 A shadow deployment consists of releasing version B alongside version A, fork version A’s incoming requests and send them to version B as well without impacting production traffic. This is particularly useful to test production load on a new feature. A rollout of the application is triggered when stability and performance meet the requirements.
 This technique is fairly complex to setup and needs special requirements, especially with egress traffic出口流量. For example, given a shopping cart platform, if you want to shadow test the payment service you can end-up having customers paying twice for their order. In this case, you can solve it by creating a mocking service that replicates the response from the provider.
-![recreate](ref/shadow.gif)
 Pros:
 * Performance testing of the application with production traffic.
 * No impact on the user.

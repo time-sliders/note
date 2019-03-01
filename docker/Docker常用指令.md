@@ -12,3 +12,6 @@
 1. 退出后依然保留容器进程 `Ctrl + P + Q`
 2. 退出后不保留容器 `exit`
 
+### 查看容器错误日志
+`docker logs CONTAINER_ID`
+

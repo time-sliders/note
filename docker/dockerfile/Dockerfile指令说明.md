@@ -84,8 +84,34 @@ ENTRYPOINT 的格式和 RUN 指令格式一样，分为 exec 格式和 shell 格
     1.如果 ENTRYPOINT 不是一个等待指令，比如 echo 之类的，在 container 启动并执行完毕之后，容器会马上被关闭掉
     2.如果 ENTRYPOINT 启动的是一个 daemon 守护进程，而非主进程，则也会马上关闭
     3.如果 image 有 ENTRYPOINT，且不是 bash, 则 attach 上去是没有 bash 的，此时需要通过 exec 命令来在容器内运行一个 bash
-docker exec -it CONTAINER_ID /bin/bash
+    docker exec -it CONTAINER_ID /bin/bash
 
+**同 CMD 不同的是， ENTRYPOINT 指令不会被 docker run 命令所覆盖，而是将 docker run 指定的参数当做 ENTRYPOINT 指定命令的参数**
+  
+#### 示例
+
+**Dockerfile**
+
+    FROM baseimage:latest
+    
+    RUN cd /home/tomcat/apache-tomcat-8.5.32/ \
+        && rm -rf /home/tomcat/webapps \
+        && mkdir /home/tomcat/webapps \
+        && yum install -y net-tools.x86_64
+    
+    COPY xxxxxxxxxxx.war /home/tomcat/apache-tomcat-8.5.32/webapps
+    
+    COPY hosts /etc/
+    
+    ENTRYPOINT ["daemon.sh"]
+
+**start cmd**
+
+    docker run -dit --name xxxxxxxxxxx --cap-add=ALL -v /data/www/logs:/data/www/logs xxxxxxxxxxx:v2 run
+    docker ps -a
+    
+    CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+    538905a7c4c5        xxxxxxxxxxx:v2      "daemon.sh run"     4 seconds ago       Up 8 seconds                            xxxxxxxxxxx
  
 # VOLUME 
 定义匿名卷  
@@ -140,6 +166,8 @@ USER 指令和 WORKDIR 相似，都是改变环境状态并影响以后的层。
 # ADD
 更高级的复制文件  
 ADD 指令和 COPY 的格式和性质基本一致。
+
+**如果想把一个tar.gz 包解压之后的东西拷贝到 镜像中，建议用 ADD**
 
     但是在 COPY 基础上增加了一些功能。
     比如 <源路径> 可以是一个 URL，这种情况下，Docker 引擎会试图去下载这个链接的文件放到 <目标路径> 去。下载后的文件权限自动设置为 600，如果这并不是想要的权限，那么还需要增加额外的一层 RUN 进行权限调整，另外，如果下载的是个压缩包，需要解压缩，也一样还需要额外的一层 RUN 指令进行解压缩。所以不如直接使用 RUN 指令，然后使用 wget 或者 curl 工具下载，处理权限、解压缩、然后清理无用文件更合理。因此，这个功能其实并不实用，而且不推荐使用。

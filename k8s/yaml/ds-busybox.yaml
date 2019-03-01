@@ -1,0 +1,19 @@
+apiVersion: extensions/v1beta1
+kind: DaemonSet
+metadata:
+  name: busybox-ds
+spec:
+  template:
+    metadata:
+      labels:
+        app: busybox
+    spec:
+      containers:
+      - name: busybox
+        image: busybox
+        command:
+            - sleep
+            - "360000000000"
+        securityContext:
+          privileged: true
+

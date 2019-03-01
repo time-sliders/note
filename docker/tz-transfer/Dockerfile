@@ -1,8 +1,11 @@
 FROM baseimage:latest
 
-yum install -y net-tools.x86_64
+RUN yum install -y net-tools.x86_64
+RUN cd /home/tomcat/apache-tomcat-8.5.32/ \
+	&& rm -rf /home/tomcat/webapps \
+	&& mkdir /home/tomcat/webapps
 
-RUN cd /home/tomcat/apache-tomcat-8.5.32/ && rm -rf webapps && mkdir webapps
-COPY tz-transfer.war /home/tomcat/apache-tomcat-8.5.32/webapps
+ADD tz-transfer.war /home/tomcat/apache-tomcat-8.5.32/webapps
+COPY hosts /etc/
 
-ENTRYPOINT ["sh","/home/tomcat/apache-tomcat-8.5.32/bin/daemon.sh","run"]
+ENTRYPOINT ["daemon.sh","run"]
