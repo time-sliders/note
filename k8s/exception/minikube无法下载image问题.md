@@ -1,3 +1,7 @@
+
+
+**特别强调：Image 的 version 不要打 latest 版本，因为 latest 总会去镜像仓库下载 Image**     
+    
     k8s.gcr.io/kube-apiserver:v1.13.2  
     k8s.gcr.io/kube-controller-manager:v1.13.2  
     k8s.gcr.io/kube-scheduler:v1.13.2  
