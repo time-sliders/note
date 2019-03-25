@@ -1,0 +1,94 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  #定义副本集名称和命名空间
+  name: ${app_name}-deploy-195
+  namespace: default
+spec:
+  #定义节点数和label
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ${app_name}-195
+  template:
+    metadata:
+      labels:
+        app: ${app_name}-195
+    spec:
+      #宿主机节点选择
+      nodeSelector:
+        env: online-195
+      containers:
+        #定义应用镜像和更新方式
+        - name: ${app_name}
+          image: harbor.company.org/company-online/${app_name}:${TAG}
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8080
+          #资源定义
+          resources:
+            limits:
+              #cpu: 1000m
+              memory: 6Gi
+            requests:
+              #cpu: 200m
+              memory: 4Gi
+          #探针
+          livenessProbe:
+            httpGet:
+              path: /status.jsp
+              port: 8080
+              scheme: HTTP
+            initialDelaySeconds: 100
+            periodSeconds: 10
+            successThreshold: 1
+            timeoutSeconds: 3
+            failureThreshold: 10
+          readinessProbe:
+            httpGet:
+              path: /status.jsp
+              port: 8080
+              scheme: HTTP
+            periodSeconds: 10
+            successThreshold: 2
+            timeoutSeconds: 3
+            failureThreshold: 5
+          #在环境变量定义DISCONF和JVM参数覆盖默认值
+          env:
+            - name: DISCONF_CONF_SERVER_HOST
+              value: "disconf.company.org"
+            - name: DISCONF_APP
+              value: "${app_name}"
+            - name: DISCONF_ENV
+              value: "online_195"
+            - name: DISCONF_VERSION
+              value: "1_0_0_0"
+            - name: TOMCAT_PORT
+              value: "8080"
+            - name: SET_JVM_Xms
+              value: "4096m"
+            - name: SET_JVM_Xmx
+              value: "4096m"
+            - name: SET_JVM_Xmn # 年轻代大小 整个堆大小=年轻代大小 + 年老代大小 + 持久代大小。持久代一般固定大小为64m，所以增大年轻代后，将会减小年老代大小。此值对系统性能影响较大，Sun官方推荐配置为整个堆的3/8。
+              value: "2048m"
+            - name: SET_JVM_Xss # 设定每个线程的堆栈大小,默认JDK1.4中是256K，JDK1.5+中是1M，在相同物理内存下，减小这个值能生成更多的线程。但是操作系统对一个进程内的线程数还是有限制的，不能无限生成，经验值在3000~5000左右
+              value: "256k"
+          #挂载卷
+          volumeMounts:
+            - name: localtime
+              mountPath: /etc/localtime
+              readOnly: true
+            - name: logs
+              mountPath: /data/www/logs/apps
+      volumes:
+        - name: localtime
+          hostPath:
+            path: /etc/localtime
+        - name: logs
+          hostPath:
+            path: /data/www/logs/apps
+      #定义节点host
+      hostAliases:
+        - ip: "*.*.*.*"
+          hostnames:
+            - "res.company.com"

@@ -131,7 +131,7 @@ $ `cat pod.json | kubectl replace -f -`                              # 基于 st
     >$ `kubectl label pods my-pod new-label=awesome`                      # 添加pod标签  
 $ `kubectl label node node-name new-label=awesome`                   # 添加node标签  
 $ `kubectl annotate pods my-pod icon-url=http://goo.gl/XXBTWq`       # 添加注解  
-$ `kubectl autoscale deployment foo --min=2 --max=10`                # 自动扩展 deployment “foo”  
+$ `kubectl autoscale deployment foo --min=2 --max=10`                # 自动扩展 deployment "foo"  
 $ `kubectl get nodes --show-labels`                                  # 显示标签  
 $ `kubectl label nodes nodename labelname- `                         # 删除label   
 
