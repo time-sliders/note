@@ -1,3 +1,5 @@
+参考资料：[DUBBO源码解读](https://yq.aliyun.com/articles/272405)
+
 # service bean 的创建
 spring-dubbo.xml 示例 
 
