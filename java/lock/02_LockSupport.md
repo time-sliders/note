@@ -1,10 +1,13 @@
 # LockSupport
 
+#### 介绍
+
+通过 Unsafe 类的底层方法，实现了线程 park 和 unpark 的逻辑。这个类主要用于给其他高级的锁，提供锁实现的一些基础方法。
 ## javadoc 翻译
 
 Basic thread blocking primitives for creating locks and other synchronization classes. 
 
-**LockSupport是用来创建锁和其他同步类的基本线程阻塞原语。**
+**LockSupport 是用来创建锁和其他同步类的基本线程阻塞原语。**
 
 This class associates`与……发生联系`, with each thread that uses it, a **permit** (in the sense`感觉` of the *Semaphore* class). A call to `park` will return immediately if the **permit** is available, consuming it in the process; otherwise it *may* block. A call to `unpark` makes the **permit** available, if it was not already available. (Unlike with Semaphores though`虽然`, **permits** do not accumulate. <u>There is at most one</u>.) 
 
