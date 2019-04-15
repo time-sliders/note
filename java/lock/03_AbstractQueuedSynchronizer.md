@@ -2,7 +2,7 @@
 
 ## 介绍
 
-一个在 LockSupport 的基础上实现的队列同步器，内部维护了维护了一个volatile int state（代表共享资源）和一个FIFO的等待队列，支持独占/共享两种模式。由于 tryAcquire 方法是先检查，再入队。所以在极端场景下，存在一个会导致不公平的现象，比如 A 线程持有锁，B 线程申请时，发现已经被 A 独占，所以 B 执行入队，再 B 还未完成入队的情况下，C 线程正好申请锁，而且恰好此时 A 线程释放了这把锁，那么这个时候，C线程有可能比 B 线程 先拿到锁，从而导致不公平的现象，这个不公平的机制可以提高锁的吞吐量和可伸缩性，性能更好，所以是默认的策略。
+一个在 *LockSupport* 的基础上实现的队列同步器，内部维护了维护了一个`volatile int state`（代表共享资源）和一个FIFO的等待队列，支持独占/共享两种模式。由于 `acquire` 方法是先检查（`tryAcquire`），再入队(`addWaiter`)。所以在极端场景下，存在一个会导致不公平的现象，比如 A 线程持有锁，B 线程申请时，发现已经被 A 独占，所以 B 执行入队，再 B 还未完成入队的情况下，C 线程正好申请锁，而且恰好此时 A 线程释放了这把锁，那么这个时候，C线程有可能比 B 线程 先拿到锁，从而导致不公平的现象，这个不公平的机制可以提高锁的吞吐量和可伸缩性（因为相比较将B线程入队，如果直接让B线程获取锁，节省了B线程入队+唤醒的开销），性能更好，所以是默认的策略。
 
 AQS 队列同步器只实现锁队列&中断唤醒等方法，对于共享资源的管理，需要子类实现。
 
@@ -350,7 +350,7 @@ private void setHeadAndPropagate(Node node, int propagate) {
 
 Provides a framework for implementing blocking locks and related synchronizers (semaphores, events, etc) that rely on first-in-first-out (FIFO) wait queues`提供了一种实现阻塞锁和一系列依赖FIFO等待队列的同步器的框架`. This class is designed to be a useful basis for most kinds of synchronizers that **rely on a single atomic int value to represent state**. Subclasses must define the `protected` methods that change this **state**, and which define what that **state** means in terms of`依据` this object being *acquired* or *released*. Given these, the other methods in this class carry out`执行` all queuing and blocking mechanics`机制`. Subclasses can maintain other state fields, but only the atomically updated int value manipulated using methods `getState`, `setState` and `compareAndSetState` is tracked with respect to synchronization.
 
-**Subclasses should be defined as non-public internal helper classes that are used to implement the synchronization properties of their enclosing`内部` class**. Class `AbstractQueuedSynchronizer` does not implement any synchronization interface. Instead it defines methods such as `acquireInterruptibly` that can be invoked as appropriate`适当的` by concrete`具体的` locks and related synchronizers to implement their public methods`相反，它定义了AcquireInterruptly等方法，这些方法可以由具体的锁和相关的同步器根据需要调用，以实现它们的公共方法`。.
+**Subclasses should be defined as non-public internal helper classes that are used to implement the synchronization properties of their enclosing`内部` class**. Class `AbstractQueuedSynchronizer` does not implement any synchronization interface. Instead it defines methods such as `acquireInterruptibly` that can be invoked as appropriate`适当的` by concrete`具体的` locks and related synchronizers to implement their public methods`相反，它定义了AcquireInterruptly等方法，这些方法可以由具体的锁和相关的同步器根据需要调用，以实现它们的公共方法`.
 
 This class supports either or both a default exclusive`独占` mode and a shared`共享` mode`此类支持默认独占模式和共享模式中的一种或两种`. When acquired in exclusive mode, attempted acquires by other threads cannot succeed. Shared mode acquires by multiple threads may (but need not`但不需要`) succeed. This class does not "understand" these differences except in the mechanical sense that when a shared mode acquire succeeds, the next waiting thread (if one exists) must also determine whether it can acquire as well. **Threads waiting in the different modes share the same FIFO queue**. Usually, implementation subclasses support only one of these modes, but both can come into play for example in a `ReadWriteLock`. Subclasses that support only exclusive or only shared modes need not define the methods supporting the unused mode.
 
@@ -391,7 +391,7 @@ while (!tryAcquire(arg)) {
 ```
 
 (Shared mode is similar but may involve cascading signals`涉及级联信号`.)
-**Because checks in acquire are invoked before enqueuing`入队`, a newly acquiring thread may barge`闯入` ahead of others that are blocked and queued.** However, you can, if desired, define `tryAcquire` and/or `tryAcquireShared` to disable barging by internally invoking one or more of the inspection`检查` methods, thereby`从而` providing a **fair** FIFO acquisition order. In particular, most fair synchronizers can define `tryAcquire` to return false if `hasQueuedPredecessors` (a method specifically designed to be used by fair synchronizers) returns true. Other variations`变化` are possible.
+**Because checks in acquire are invoked before enqueuing`入队`, a newly acquiring thread may barge`闯入` ahead of others that are blocked and queued.** However, you can, if desired, define `tryAcquire` and/or `tryAcquireShared` to disable barging by **internally invoking one or more of the inspection`检查` methods, thereby`从而` providing a *fair* FIFO acquisition order**. In particular, **most fair synchronizers can define `tryAcquire` to return false if `hasQueuedPredecessors` (a method specifically designed to be used by fair synchronizers) returns true. Other variations`变化` are possible**.
 
 Throughput`吞吐量` and scalability`可扩展性` are generally highest for the default barging (also known as *greedy*`贪心`, *renouncement*`拒绝`, and *convoy-avoidance*`避孕`) strategy. While`虽然` this is not guaranteed to be fair or starvation-free`无饥饿`, earlier queued threads are allowed to recontend`再竞争` before later queued threads, and each recontention has an unbiased`无偏见的` chance to succeed against`在…之前` incoming threads. Also`此外`, while`虽然` acquires do not "**spin**" in the usual sense, they may perform multiple invocations of `tryAcquire` interspersed`多次` with other computations`计算/估计` before blocking. This gives most of the benefits of spins when exclusive synchronization is only briefly held, without most of the liabilities when it isn't. If so desired, you can augment this by preceding calls to `acquire` methods with "fast-path" checks, possibly prechecking `hasContended` and/or `hasQueuedThreads` to only do so if the synchronizer is likely not to be contended.
 
@@ -490,6 +490,4 @@ class BooleanLatch {
 ```
 
 
-
- 
 
