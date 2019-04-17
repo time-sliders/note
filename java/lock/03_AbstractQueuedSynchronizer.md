@@ -167,7 +167,7 @@ protected boolean tryAcquire(int arg) {
 
 **综上** 整个申请锁的流程为
 
-![AQS-Acquire](/Users/zhangwei/github/note/java/lock/ref/juc-AQS-Acquire.png)
+![AQS-Acquire](ref/juc-AQS-Acquire.png)
 
 
 

@@ -19,7 +19,7 @@ final Sync sync;
 
 其中，核心字段 `Sync` 用以控制读写锁的同步机制。
 
-#### Sync
+### Sync
 
 * 读写状态存储
 
@@ -151,7 +151,7 @@ protected final int tryAcquireShared(int unused) {
 
 ##### Sync#tryAcquireShared => fullTryAcquireShared
 
-在 `tryAcquireShared` 方法中，如果当前线程有合格的条件申请锁，但是在申请锁时，以下条件`!readerShouldBlock() && r < MAX_COUNT && compareAndSetState(c, c + SHARED_UNIT)` 失败的时候，会进入 `fullTryAcquireShared`。
+在 `tryAcquireShared` 方法中，如果当前线程有合格的条件申请锁，但是在申请锁时，以下条件`!readerShouldBlock() && r < MAX_COUNT && compareAndSetState(c, c + SHARED_UNIT)` 失败的时候，会进入 `fullTryAcquireShared`。该方法采用**自旋锁**控制，而不是中断。
 
 ```java
 /**
@@ -239,18 +239,17 @@ final int fullTryAcquireShared(Thread current) {
 > Can outlive the Thread for which it is caching the read hold count, but avoids garbage retention by not retaining a reference to the Thread.
 > Accessed via a benign data race; relies on the memory model's final field and out-of-thin-air guarantees.
 
-
-
 #### Sync#tryReleaseShared 尝试释放读锁
 
 ```java
 @ReservedStackAccess
 protected final boolean tryReleaseShared(int unused) {
     Thread current = Thread.currentThread();
+    // 修改统计 Counter 字段
     if (firstReader == current) {
         // assert firstReaderHoldCount > 0;
         if (firstReaderHoldCount == 1)
-            firstReader = null;
+            firstReader = null;// 最后一次释放时把指针置空
         else
             firstReaderHoldCount--;
     } else {
@@ -266,6 +265,7 @@ protected final boolean tryReleaseShared(int unused) {
         }
         --rh.count;
     }
+  	// 修改 state 锁状态字段
     for (;;) {
         int c = getState();
         int nextc = c - SHARED_UNIT;
@@ -277,6 +277,155 @@ protected final boolean tryReleaseShared(int unused) {
     }
 }
 ```
+
+#### Sync#tryWriteLock
+
+```java
+/**
+ * Performs tryLock for write, enabling barging in both modes.
+ * This is identical in effect to tryAcquire except for lack
+ * of calls to writerShouldBlock.
+ */
+@ReservedStackAccess
+final boolean tryWriteLock() {
+    Thread current = Thread.currentThread();
+    int c = getState();
+    if (c != 0) {
+        int w = exclusiveCount(c);
+      	// c!=0 && w==0 表示存在读锁，此时不能加写锁
+      	// 如果持有读锁的线程就是当前线程，则可以继续加锁 （可重入）
+        if (w == 0 || current != getExclusiveOwnerThread())
+            return false;
+        if (w == MAX_COUNT)
+            throw new Error("Maximum lock count exceeded");
+    }
+    // 尝试获取锁
+    if (!compareAndSetState(c, c + 1))
+        return false;
+  	// 设置独占线程
+    setExclusiveOwnerThread(current);
+    return true;
+}
+```
+
+#### Sync#tryReadLock
+
+```java
+/**
+ * Performs tryLock for read, enabling barging in both modes.
+ * This is identical in effect to tryAcquireShared except for
+ * lack of calls to readerShouldBlock.
+ */
+@ReservedStackAccess
+final boolean tryReadLock() {
+    Thread current = Thread.currentThread();
+    for (;;) {
+        int c = getState();
+      	// 其他线程持有读锁，直接失败
+        if (exclusiveCount(c) != 0 &&
+            getExclusiveOwnerThread() != current)
+            return false;
+        int r = sharedCount(c);
+        if (r == MAX_COUNT)
+            throw new Error("Maximum lock count exceeded");
+      	// 尝试获取读锁 这里如果并发高，导致CAS miss，则一直重试，直到成功
+        if (compareAndSetState(c, c + SHARED_UNIT)) {
+            if (r == 0) {
+                firstReader = current;
+                firstReaderHoldCount = 1;
+            } else if (firstReader == current) {
+                firstReaderHoldCount++;
+            } else {
+                HoldCounter rh = cachedHoldCounter;
+                if (rh == null ||
+                    rh.tid != LockSupport.getThreadId(current))
+                    cachedHoldCounter = rh = readHolds.get();
+                else if (rh.count == 0)
+                    readHolds.set(rh);
+                rh.count++;
+            }
+            return true;
+        }
+    }
+}
+```
+
+### NonfairSync
+
+```java
+/**
+ * Nonfair version of Sync
+ */
+static final class NonfairSync extends Sync {
+    private static final long serialVersionUID = -8159625535654395037L;
+    final boolean writerShouldBlock() {
+        return false; // writers can always barge
+    }
+    final boolean readerShouldBlock() {
+        /* As a heuristic启发式的 to avoid indefinite无限的 writer starvation饥饿,
+         * block if the thread that momentarily立刻，马上 appears to be head
+         * of queue, if one exists, is a waiting writer.  This is
+         * only a probabilistic或然性，概率的 effect since a new reader will not
+         * block if there is a waiting writer behind other enabled
+         * readers that have not yet drained排空 from the queue.
+         */
+        return apparentlyFirstQueuedIsExclusive();
+    }
+}
+
+```
+
+```java
+/**
+ * Returns {@code true} if the apparent first queued thread, if one
+ * exists, is waiting in exclusive mode.  If this method returns
+ * {@code true}, and the current thread is attempting to acquire in
+ * shared mode (that is, this method is invoked from {@link
+ * #tryAcquireShared}) then it is guaranteed that the current thread
+ * is not the first queued thread.  Used only as a heuristic in
+ * ReentrantReadWriteLock.
+ */
+final boolean apparentlyFirstQueuedIsExclusive() {
+    Node h, s;
+    return (h = head) != null &&
+        (s = h.next)  != null &&
+        !s.isShared()         &&
+        s.thread != null;
+}
+```
+
+可以看到，在不公平模式下，读锁永远可以不公平，直接插队，但是如果是写锁的话，即使是不公平策略，也要根据队列情况来做不同的处理，如果**队列下一个 Node 是写锁的话，那么读锁必须入队**。这样做是为了**避免在读并发特别高的情况下，写锁一直无法获取锁的现象，即"饥饿"**
+
+### FairSync
+
+```java
+/**
+ * Fair version of Sync
+ */
+static final class FairSync extends Sync {
+    private static final long serialVersionUID = -2274990926593161451L;
+    final boolean writerShouldBlock() {
+        return hasQueuedPredecessors();
+    }
+    final boolean readerShouldBlock() {
+        return hasQueuedPredecessors();
+    }
+}
+```
+
+公平锁，无论是读锁，还是写锁，都需要判断是否有等待队列，如果有等待队列，在acquire 方法里面，不能直接 try ，需要**先入队**。
+
+### 整体架构图
+
+读写锁整体架构如下，内部包含一个 AQS队列同步器 Sync，通过二进制的按位拆分，高16位存储读状态，低16位存储写状态，Sync内部定义了申请读锁与申请写锁的逻辑。WriteLock 与ReadLock 是读写锁内部的2个子锁，依然是通过 Sync 来进行同步。
+
+![juc-rwl_all.png](ref/juc-rwl_all.png)
+
+
+
+##### 思维误区：AQS锁是一个队列锁，所以理论上应该是不存在读写争用的情况，ReentrantReadWriteLock 是如何实现读锁与读锁不互斥的？
+
+<u>的确如上所属，但是需要理解的是，AQS锁在 acquire 方法内部，是先 tryAcquire的，只有当try 失败的时候，才会去排队，在ReentrantReadWriteLock 内部实现的 AQS 子类 Sync 中，在 Sync 实现的 tryAcquire & tryAcquireShared 方法中，根据读写互斥，读读不互斥的具体需求，实现的读写锁逻辑，此时，如果 head 被读锁持有，一个读锁来申请时，是直接在 try 阶段就返回成功了的，因此不需要排队。这也是为什么即使在不公平模式下，即使当前是读锁，如果head.next 是写锁，读锁也要排队，因为如果并发特别高的情况下，写锁真的会因为一直有读锁持有锁而造成饥饿的现象。</u>
 
 ## javadoc
 

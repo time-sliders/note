@@ -131,12 +131,12 @@ final boolean transferForSignal(Node node) {
 
 由于`await`方法必须在占有锁后才能调用，因此，最开始线程所在的节点应该位于同步队列中的，如下图所示：
 
-![juc-condition_get_lock](/Users/zhangwei/github/note/java/lock/ref/juc-condition_get_lock.png)
+![juc-condition_get_lock](ref/juc-condition_get_lock.png)
 
 当成功调用了`Condition`的`await`方法时，表示线程拿到了锁，因此从同步队列中移除了，在`await`方法内部的`addConditionWaiter`执行后，节点加入到了等待队列中，即节点变化过程如下：
 
-![juc-condition_await](/Users/zhangwei/github/note/java/lock/ref/juc-condition_await.png)
+![juc-condition_await](ref/juc-condition_await.png)
 
 之后`await`方法会通过`isOnSyncQueue`方法判断，节点是否在同步队列中，至于为什么要判断，上面我已经做了解释，不再重复。`signal`和`signalAll`方法就是将条件队列中的节点按顺序移除，并重新添加到同步队列，下面我们就看看`signal`方法中，节点的变化过程：
 
-![juc-condition_signal](/Users/zhangwei/github/note/java/lock/ref/juc-condition_signal.png)
+![juc-condition_signal](ref/juc-condition_signal.png)

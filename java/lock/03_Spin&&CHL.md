@@ -12,7 +12,7 @@ CLH(Craig, Landin, andHagersten locks)是一钟**自旋锁**，能确保无饥�
 
 CLH锁是一种基于链表的可扩展、高性能、公平的自旋锁，申请线程只在本地变量上自旋，它**不断轮询前驱的状态，如果发现前驱释放了锁就结束自旋**。
 
-![juc_CLH](/Users/zhangwei/github/note/java/lock/ref/juc-CLH.png)
+![juc_CLH](ref/juc-CLH.png)
 
 CLH 队列中的结点`QNode`中含有一个 `locked` 字段，该字段若为`true`表示该线程需要获取锁，且不释放锁，为`false`表示线程释放了锁。结点之间是通过隐形的链表相连，之所以叫隐形的链表是因为这些结点之间没有明显的`next`指针，而是通过`myPred`所指向的结点的变化情况来影响`myNode`的行为。`CLHLock`上还有一个尾指针，始终指向队列的最后一个结点。
 
