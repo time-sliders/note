@@ -140,3 +140,6 @@ final boolean transferForSignal(Node node) {
 之后`await`方法会通过`isOnSyncQueue`方法判断，节点是否在同步队列中，至于为什么要判断，上面我已经做了解释，不再重复。`signal`和`signalAll`方法就是将条件队列中的节点按顺序移除，并重新添加到同步队列，下面我们就看看`signal`方法中，节点的变化过程：
 
 ![juc-condition_signal](ref/juc-condition_signal.png)
+
+**这里需要特别注意的是，在条件队列等待的线程，被signal之后，并不是马上执行，而是加入到了 waiterQueue，只有当再次排队到队首之后，也就是再次拿到了锁，才能走出 await 方法，继续往下执行**。
+
