@@ -24,8 +24,10 @@ AQS 队列同步器只实现锁队列&中断唤醒等方法，对于共享资源
  *        can represent anything you like.
  */
 public final void acquire(int arg) {
-    if (!tryAcquire(arg) &&
-        acquireQueued(addWaiter(Node.EXCLUSIVE), arg))
+    if (!tryAcquire(arg) && // 尝试锁
+        acquireQueued(addWaiter(Node.EXCLUSIVE), arg)) // 入队
+      	// 如果是 interrupt结束，由于里面调用了 isInterrupt 消耗掉了 status
+      	// 所以这里重置下状态，给外边用？
         selfInterrupt();
 }
 ```
@@ -102,14 +104,16 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
         /*
          * This node has already set status asking a release
          * to signal it, so it can safely park.
-         * 上一个节点已经设置状态为：在释放锁之后，通知当前节点。所以现在可以安全的park
+         * 上一个节点已经设置状态为：在释放锁之后，
+         * 通知当前节点。所以现在可以安全的park
          */
         return true;
     if (ws > 0) {
         /*
          * Predecessor was cancelled. Skip over略过 predecessors and
          * indicate retry.
-         * 如果上一个节点放弃了，那就一直往前找，直到找到最近一个正常等待的状态，并排在它的后边
+         * 如果上一个节点放弃了，那就一直往前找，直到找
+         * 到最近一个正常等待的状态，并排在它的后边
          */
         do {
             node.prev = pred = pred.prev;
@@ -128,6 +132,10 @@ private static boolean shouldParkAfterFailedAcquire(Node pred, Node node) {
     return false;
 }
 ```
+
+##### head.next 节点，在 head release资源之后，是怎么被唤醒并获取资源的？
+
+
 
 #### tryAcquire
 
@@ -283,7 +291,8 @@ private void doAcquireShared(int arg) {
             if (p == head) { // head是拿到资源的线程，head用完资源来唤醒自己
                 int r = tryAcquireShared(arg);
                 if (r >= 0) { // >=0 成功，正数表示还有剩余资源
-                    setHeadAndPropagate(node, r);// 升为head，如果有多余的资源，传播下去
+                  	// 升为head，如果有多余的资源，传播下去
+                    setHeadAndPropagate(node, r);
                     p.next = null; // help GC
                     if (interrupted)
                         selfInterrupt();
@@ -291,7 +300,8 @@ private void doAcquireShared(int arg) {
                 }
             }
           
-          	//判断状态，寻找安全点，进入 park() 状态，等着被 unpark() 或 interrupt()
+          	//判断状态，寻找安全点，进入 park() 状态，等
+          	//着被 unpark() 或 interrupt()
             if (shouldParkAfterFailedAcquire(p, node) &&
                 parkAndCheckInterrupt())
                 interrupted = true;
@@ -345,6 +355,48 @@ private void setHeadAndPropagate(Node node, int propagate) {
     }
 }
 ```
+
+#### doReleaseShared
+
+```java
+/**
+ * Release action for shared mode -- signals successor and ensures
+ * propagation. (Note: For exclusive mode, release just amounts
+ * to calling unparkSuccessor of head if it needs signal.)
+ */
+private void doReleaseShared() {
+    /*
+     * Ensure that a release propagates, even if there are other
+     * in-progress acquires/releases.  This proceeds in the usual
+     * way of trying to unparkSuccessor of head if it needs
+     * signal. But if it does not, status is set to PROPAGATE to
+     * ensure that upon release, propagation continues.
+     * Additionally, we must loop in case a new node is added
+     * while we are doing this. Also, unlike other uses of
+     * unparkSuccessor, we need to know if CAS to reset status
+     * fails, if so rechecking.
+     */
+    for (;;) {
+        Node h = head;
+        if (h != null && h != tail) {
+            int ws = h.waitStatus;
+            if (ws == Node.SIGNAL) { // 如果有下一个节点，那么head肯定是SIGNAL
+                if (!h.compareAndSetWaitStatus(Node.SIGNAL, 0))
+                    continue;            // loop to recheck cases
+              	// 持有锁的节点释放锁之后，唤醒head节点的下一个等待线程
+                unparkSuccessor(h);
+            }
+            else if (ws == 0 &&
+                     !h.compareAndSetWaitStatus(0, Node.PROPAGATE))
+                continue;                // loop on failed CAS
+        }
+        if (h == head)                   // loop if head changed
+            break;
+    }
+}
+```
+
+在共享模式下，如果等待队列中有多个共享节点处于等待状态，head.next 节点获取到资源之后，判断有无剩余资源，在有剩余资源的前提下，并设置当前节点为head节点，然后唤醒下一个节点（即传播）。这里要注意的是，由于head节点只有一个，所以，如果很多个 shareNode 都获取资源成功，则处于原等待队列的最后获取资源成功的节点将会成为head（因为它是传播的终点站）。
 
 ## javadoc 翻译
 
