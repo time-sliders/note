@@ -31,7 +31,7 @@ The Garbage-First collector is not a real-time collector. It tries to meet set p
 
 ### Heap Layout
 
-**G1 partitions the heap into a set of equally sized heap regions, each a contiguous range of virtual memory`连续的内存范围` as shown in Figure 9-1. A region is the unit of memory allocation and memory reclamation`回收`. At any given time, each of these regions can be empty (light gray`浅灰色`), or assigned to a particular generation`或者分配给特定的一代`, young or old. As requests for memory comes in, the memory manager hands out`找出` free regions. The memory manager assigns them to a generation and then returns them to the application as free space into which it can allocate itself.**
+**G1 partitions the heap into a set of equally sized heap regions, each a contiguous range of virtual memory`连续的内存范围` as shown in Figure 9-1. A region is the unit of memory allocation and memory reclamation`回收`. At any given time, each of these regions can be empty (light gray`浅灰色`), or assigned to a particular generation`或者分配给特定的一代`, young or old. As requests for memory comes in, the *memory manager* hands out`找出` free regions. The *memory manager* assigns them to a generation and then returns them to the application as free space into which it can allocate itself.**
 
 Figure 9-1 G1 Garbage Collector Heap Layout
 
@@ -45,7 +45,7 @@ Figure 9-1 G1 Garbage Collector Heap Layout
 
 **An application always allocates into a young generation, that is`也就是`, eden regions, with the exception of`除了...的例外` humongous, objects that are directly allocated as belonging to the old generation.`除了大对象是直接分配给年老代之外`**
 
-G1 garbage collection pauses can reclaim space in the young generation as a whole`作为整体`, and any additional set of old generation regions at any collection pause. During the pause G1 copies objects from this *collection set* to one or more different regions in the heap. The destination region for an object depends on the source region of that object: the entire young generation is copied into either survivor or old regions, and objects from old regions to other, different old regions using aging`老化`.
+<u>**G1 garbage collection pauses can reclaim space in the young generation as a whole`作为整体`, and any additional set of old generation regions at any collection pause**</u>. During the pause G1 copies objects from this *collection set* to one or more different regions in the heap. The destination region for an object depends on the source region of that object: the entire young generation is copied into either survivor or old regions, and objects from old regions to other, different old regions using aging`老化`.
 
 
 
@@ -69,9 +69,9 @@ The following list describes the phases, their pauses and the transition`过渡`
 
 1. **Young-only phase**: This phase starts with a few young-only collections that promote`推送` objects into the old generation. The transition between the young-only phase and the space-reclamation phase starts when the old generation occupancy`使用率` reaches a certain threshold, the Initiating Heap Occupancy threshold. <u>At this time, G1 schedules an Initial **Mark** young-only collection instead of a **regular** young-only collection.</u>
    - **Initial Mark** : This type of collection <u>starts the marking process</u> in addition to performing a regular young-only collection. Concurrent marking <u>determines all currently reachable (live) objects</u> in the old generation regions to be kept for the following space-reclamation phase. While marking hasn’t completely finished, regular young collections may occur. <u>Marking finishes with two special stop-the-world pauses</u>: Remark and Cleanup.
-   - **Remark**: This pause finalizes the marking itself, and performs global reference processing`全局引用处理` and class unloading`类卸载`. Between `Remark` and `Cleanup` G1 calculates a summary of the liveness information concurrently, which will be `finalized` and used in the Cleanup pause to update internal data structures.
+   - **Remark**: This pause finalizes the marking itself, and performs global reference processing`全局引用处理` and class unloading`类卸载`. Between `Remark` and `Cleanup` G1 **calculates a summary of the liveness information** concurrently, which will be `finalized` and used in the Cleanup pause to update internal data structures.
    - **Cleanup**: This pause also **reclaims completely empty regions**, and determines whether a space-reclamation phase will actually follow. If a space-reclamation phase follows, the young-only phase completes with a single young-only collection.
-2. **Space-reclamation phase**: **This phase consists of`包括` multiple mixed collections that in addition to`另外` young generation regions, also evacuate live objects of sets of old generation regions**. <u>The space-reclamation phase ends when G1 determines that evacuating more old generation regions wouldn't yield`产生` enough free space worth the effort.</u>
+2. **Space-reclamation phase**: **This phase consists of`包括` multiple mixed collections that in addition to`另外` young generation regions, also evacuate`转移,疏散` live objects of sets of old generation regions**. <u>The space-reclamation phase ends when G1 determines that evacuating more old generation regions wouldn't yield`产生` enough free space worth the effort.</u>
 
 After space-reclamation, the collection cycle restarts with another young-only phase. As backup, <u>if the application runs out of memory while gathering liveness information, G1 **performs an in-place stop-the-world full heap compaction** (Full GC) like other collectors.</u>
 
@@ -81,13 +81,13 @@ After space-reclamation, the collection cycle restarts with another young-only p
 
 This section describes some important details of the Garbage-First (G1) garbage collector.
 
-### Determining Initiating Heap Occupancy
+### Determining Initiating Heap`启动堆` Occupancy
 
-The *Initiating Heap Occupancy Percent (IHOP)* is the threshold at which an Initial Mark collection is triggered and it is defined as a percentage of the old generation size.
+The *Initiating Heap Occupancy Percent (IHOP)* is the **threshold** at which an **Initial Mark collection** is triggered and it is <u>defined as a percentage of the old generation size.</u>
 
-G1 by default automatically determines an optimal`最优的` IHOP by observing`观察` how long marking takes and how much memory is typically allocated in the old generation during marking cycles. This feature is called *Adaptive IHOP*. If this feature is active, then the option `-XX:InitiatingHeapOccupancyPercent` determines the initial value as a percentage of the size of the current old generation as long as there aren't enough observations to make a good prediction of the Initiating Heap Occupancy threshold. Turn off this behavior of G1 using the option`-XX:-G1UseAdaptiveIHOP`. In this case, the value of `-XX:InitiatingHeapOccupancyPercent` always determines this threshold.
+**G1 by default automatically determines an optimal`最优的` IHOP by observing`观察` how long marking takes and how much memory is typically allocated in the old generation during marking cycles**. This feature is called *Adaptive IHOP*. If this feature is active, then the option `-XX:InitiatingHeapOccupancyPercent` determines the initial value as a percentage of the size of the current old generation as long as there aren't enough observations to make a good prediction of the Initiating Heap Occupancy threshold. Turn off this behavior of G1 using the option`-XX:-G1UseAdaptiveIHOP`. In this case, the value of `-XX:InitiatingHeapOccupancyPercent` always determines this threshold.
 
-Internally, Adaptive IHOP tries to set the Initiating Heap Occupancy so that the first mixed garbage collection of the space-reclamation phase starts when the old generation occupancy is at a current maximum old generation size minus the value of `-XX:G1HeapReservePercent` as the extra buffer.
+Internally, *Adaptive IHOP* tries to set the Initiating Heap Occupancy so that the first mixed garbage collection of the space-reclamation phase starts when the old generation occupancy is at a current maximum old generation size minus the value of `-XX:G1HeapReservePercent` as the extra buffer.
 
 ### Marking
 
@@ -95,7 +95,7 @@ G1 marking uses an algorithm called **Snapshot-At-The-Beginning** (SATB) . <u>It
 
 ### Behavior in Very Tight`紧密` Heap Situations
 
-When the application keeps alive so much memory so that an evacuation can't find enough space to copy to, an evacuation failure occurs. Evacuation failure means that G1 tries to complete the current garbage collection by keeping any objects that have already been moved in their new location, and not copying any not yet moved objects, only adjusting references between the object. Evacuation failure may incur`引起` some additional overhead, but generally should be as fast as一样快 other young collections. After this garbage collection with the evacuation failure, G1 will resume the application as normal without any other measures`不采取任何操作的情况下唤醒应用程序`. G1 assumes`假设` that the evacuation failure occurred close to`接近` the end of the garbage collection; that is, most objects were already moved and there is enough space left to continue running the application until marking completes and space-reclamation starts.
+When the application keeps alive so much memory so that an evacuation can't find enough space to copy to, an evacuation failure occurs. Evacuation failure means that G1 tries to complete the current garbage collection by keeping any objects that have already been moved in their new location, and not copying any not yet moved objects, only adjusting references between the object. Evacuation failure may incur`引起` some additional overhead, but generally should be as fast as`一样快` other young collections. After this garbage collection with the evacuation failure, G1 will resume the application as normal without any other measures`不采取任何操作的情况下唤醒应用程序`. G1 assumes`假设` that the evacuation failure occurred close to`接近` the end of the garbage collection; that is, most objects were already moved and there is enough space left to continue running the application until marking completes and space-reclamation starts.
 
 **If this assumption doesn’t hold, then G1 will eventually <u>schedule a Full GC</u>**. This type of collection performs in-place compaction of the entire heap. This might be very slow.
 
@@ -157,13 +157,13 @@ Table 9-1 Ergonomic Defaults G1 GC
 
 This is a summary of the main differences between G1 and the other collectors:
 
-- **Parallel GC can compact and reclaim space in the old generation only as a whole. G1 incrementally distributes this work across multiple much shorter collections. This substantially shortens pause time at the potential expense of throughput.**
-- **Similar to the CMS, G1 concurrently performs part of the old generation space-reclamation concurrently. However, CMS can't defragment the old generation heap, eventually running into long Full GC's.**
-- **G1 may exhibit higher overhead than other collectors, affecting throughput due to its concurrent nature.**
+- **Parallel GC can compact and reclaim space in the old generation only as a whole. G1 incrementally distributes this work across multiple much shorter collections. This substantially shortens pause time at the potential expense of throughput.**`并行GC只能作为一个整体压缩和回收旧一代的空间。g1将这个工作增量地分布在多个更短的集合中。这大大缩短了暂停时间，但可能会牺牲吞吐量。`
+- **Similar to the CMS, G1 concurrently performs part of the old generation space-reclamation concurrently. However, CMS can't defragment the old generation heap, eventually running into long Full GC's.**`与CMS类似，G1同时执行部分旧一代空间回收。但是，CMS无法对旧代堆进行碎片整理，最终会运行到长时间的完整GC`
+- **G1 may exhibit higher overhead than other collectors, affecting throughput due to its concurrent nature.**`G1可能会比其他收集器显示更高的开销，因为它的并发性会影响吞吐量。`
 
 Due to how it works, G1 has some unique mechanisms to improve garbage collection efficiency:
 
-- **G1 can reclaim some completely empty, large areas of the old generation during any collection. This could avoid many otherwise unnecessary garbage collections, freeing a significant amount of space without much effort.**
-- **G1 can optionally try to deduplicate duplicate strings on the Java heap concurrently.**
+- **G1 can reclaim some completely empty, large areas of the old generation during any collection. This could avoid many otherwise unnecessary garbage collections, freeing a significant amount of space without much effort.**`在任何收集过程中，g1都可以回收旧一代的一些完全空置的大面积土地。这可以避免许多不必要的垃圾收集，从而释放大量空间，而无需付出太多努力。`
+- **G1 can optionally try to deduplicate duplicate strings on the Java heap concurrently.**`G1可以尝试同时在Java堆上重复复制字符串。`
 
 Reclaiming empty, large objects from the old generation is always enabled. You can disable this feature with the option `-XX:-G1EagerReclaimHumongousObjects`. String deduplication is disabled by default. You can enable it using the option `-XX:+G1EnableStringDeduplication`.
