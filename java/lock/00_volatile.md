@@ -24,10 +24,12 @@ volatile 是**轻量级的 synchronized**，它在多处理器开发中保证了
 
 ![cpu-cache-bus-memory](ref/cpu-cache-bus-memory.png)
 
+![cpu-cache-bus-memory](ref/cpu-cache-access-time.jpeg)
+
 举一个简单的例子
 
 ```java
-`i++i++`
+i++
 ```
 
 当线程运行这段代码时，首先会从主存中读取i( i = 1)，然后复制一份到CPU高速缓存中，然后CPU执行 + 1 （2）的操作，然后将数据（2）写入到告诉缓存中，最后刷新到主存中。其实这样做在单线程中是没有问题的，有问题的是在多线程中。如下：
