@@ -11,9 +11,9 @@ AOP : **Aspect-Oriented Programming (AOP)** complements`补充,使完美 Compone
 
 **Join point**: a point during the execution of a program, such as the execution of a method or the handling of an exception. In Spring AOP, **a join point always represents a method execution**  这里可以理解为 JoinPoint 就是那些需要特殊处理的方法。
 
-**Advice**: **action taken by an aspect at a particular join point**. Different types of advice include “around” ,“before” and “after” advice. (Advice types are discussed below.)
+**Advice**: **action taken by an aspect at a particular join point**. Different types of advice include “around” ,“before” and “after” advice. (Advice types are discussed below.)   **advice 就是拦截方法，比如记录日志等等**
 
-**Pointcut**: a predicate`断言` that **matches** join points. **Advice** is associated with a **Pointcut** expression and runs at any **join point** matched by the **Pointcut** (for example, the execution of a method with a certain name). 一个特殊的表达式，用来连接 Advice 与 Join point
+**Pointcut**: a predicate`断言` that **matches** join points. **Advice** is associated with a **Pointcut** expression and runs at any **join point** matched by the **Pointcut** (for example, the execution of a method with a certain name). 一个特殊的表达式，用来连接 Advice 与 Join point     **即SpringAOP的匹配规则，正则表达式**
 
 **Target object**: *object being advised by one or more aspects. Also referred to as the advised object*(目标对象 ，被一个或多个切面通知的对象，通常被称为被通知对象)
 
@@ -29,7 +29,7 @@ What solution does the Proxy design pattern describe?(代理模式的解决方�
 
 # Spring如何实现AOP
 
-我们重点使用最新最简洁的spring 5 自动配置模式来进行讲解 
+我们重点使用最新最简洁的Spring 5 自动配置模式来进行讲解
 这里我们通过一个性能拦截器来演示spring aop的代码流程，这个拦截器可以打印服务层所有方法的执行时间
 
 **业务接口定义**
@@ -239,7 +239,9 @@ private static BeanDefinition registerOrEscalateApcAsRequired(
 }
 ```
 
-这里我们看到，spring 会注册一个内部的 BeanDefiniton key 是 **org.springframework.aop.config.internalAutoProxyCreator**
+这里我们看到，spring 会注册一个内部的 BeanDefiniton key 是 **org.springframework.aop.config.internalAutoProxyCreator** 类型是 `AnnotationAwareAspectJAutoProxyCreator`，下图是该类的结构图
+
+
 
 ![Spring-AspectJ.png](ref/Spring-AspectJ.png)
 
@@ -889,7 +891,7 @@ public AopProxy createAopProxy(AdvisedSupport config) throws AopConfigException 
 
 三个条件之一后，还有两个判断 是否实现了接口或是否是代理类型，通过上述判断我们可以知道spring选择代理的策略
 
-1. **如果目标类实现了接口，或者是代理类，采用 jdk动态代理 来实现 AOP**
+1. **如果目标类实现了接口且没有指定要使用cglib的情况下，或者是代理类，采用 jdk动态代理 来实现 AOP**
 2. **即使是在配置了ProxyTargetClass指定使用cglib的情况下，如果目标类是interface或者代理类的话，依然会使用Jdk代理**
 3. **如果目标类没有实现接口，只能使用 CGlib 来实现 AOP 代理（目标类不是代理类或接口）**
 
