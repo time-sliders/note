@@ -1,0 +1,20 @@
+SpringTransactionAnnotationParser
+AnnotationTransactionAttributeSource#determineTransactionAttribute
+AbstractFallbackTransactionAttributeSource#computeTransactionAttribute
+TransactionAspectSupport#invokeWithinTransaction
+TransactionInterceptor#invoke   —> MethodInterceptor  || AbstractTransactionAspect#around
+ReflectiveMethodInvocation#proceed —> MethodInvocation
+JdkDynamicAopProxy or CglibAopProxy
+
+ComponentScanBeanDefinitionParser
+ClassPathBeanDefinitionScanner#doScan->findCandidateComponents
+ClassPathScanningCandidateComponentProvider#scanCandidateComponents
+
+我们在beans.xml中开启事务的应用，需要添加
+
+
+
+
+
+
+
