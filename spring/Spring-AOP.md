@@ -241,9 +241,7 @@ private static BeanDefinition registerOrEscalateApcAsRequired(
 
 这里我们看到，spring 会注册一个内部的 BeanDefiniton key 是 **org.springframework.aop.config.internalAutoProxyCreator** 类型是 `AnnotationAwareAspectJAutoProxyCreator`，下图是该类的结构图
 
-
-
-![Spring-AspectJ.png](ref/Spring-AspectJ.png)
+![spring-aop](ref/spring-aop.png)
 
 从结构图，我们看到它实现了`BeanPostProcessor`接口，意味着spring在加载整个bean时，实例化前会调用 `postProcessAfterInitialization`方法，我们进入这个方法（在父类`AbstractAutoProxyCreator`中）
 ```java
