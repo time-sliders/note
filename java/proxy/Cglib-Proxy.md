@@ -155,6 +155,10 @@ private static final void CGLIB$BIND_CALLBACKS(Object var0) {
 ```
 `CGLIB$BIND_CALLBACKS` 先从`CGLIB$THREAD_CALLBACKS`中`get`拦截对象，如果获取不到的话，再从`CGLIB$STATIC_CALLBACKS`来获取，如果也没有则认为该方法不需要代理。
 
+综上，cglib 代理类的基本逻辑与方法调用结构如下图
+
+![Spring-ABTransaction_CglibAopProxy.png](../../spring/ref/Spring-ABTransaction_CglibAopProxy.png)
+
 那么拦截对象是如何设置到`CGLIB$THREAD_CALLBACKS` 或者 `CGLIB$STATIC_CALLBACKS`中的呢？
 
 在Jdk动态代理中拦截对象是在实例化代理类时由构造函数传入的，在`cglib`中是调用`Enhancer`的`firstInstance`方法来生成代理类实例并设置拦截对象的。`firstInstance`的调用轨迹为：
@@ -185,8 +189,6 @@ public static void CGLIB$SET_THREAD_CALLBACKS(Callback[] var0) {
 
 这里会有一个疑问，为什么不直接反射调用代理类生成的（`CGLIB$f$0`）来间接调用目标类的被拦截方法，而使用`proxy`的`invokeSuper`方法呢？这里就涉及到了另外一个点— **FastClass** 。
 
-
-
 # 三、FastClass
 
 Jdk动态代理的拦截对象是通过反射的机制来调用被拦截方法的，**反射的效率比较低**，所以cglib采用了**FastClass**的机制来实现对被拦截方法的调用。**FastClass机制就是<u>对一个类的方法建立索引，通过索引来直接调用相应的方法</u>**。
@@ -200,7 +202,7 @@ Method[] var10000 = ReflectUtils.findMethods(new String[]{"equals", "(Ljava/lang
 CGLIB$f$0$Proxy = MethodProxy.create(var1, var0, "()V", "f", "CGLIB$f$0");
 ```
 
-可以看到 `var0`  是cglib 生成的代理类，继续进入 create 方法查看
+可以看到 `var0`  是cglib 生成的代理类，继续进入 `create` 方法查看
 
 MethodProxy
 

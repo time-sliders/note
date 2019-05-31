@@ -389,7 +389,7 @@ public final class $Proxy0 extends Proxy implements Car {
 
     public final void start() throws  {
         try {
-            super.h.invoke(this, m3, (Object[])null);
+            super.h.invoke(this, m3, (Object[])null); // <<< 重点:这里直接调用 InvocationHandler#invoke 方法
         } catch (RuntimeException | Error var2) {
             throw var2;
         } catch (Throwable var3) {
@@ -427,3 +427,5 @@ public final class $Proxy0 extends Proxy implements Car {
 2. 重写了`equals`、`hashCode`、`toString`
 3. 有一个静态代码块，通过反射或者代理类的所有方法
 4. 通过 `invoke` 执行代理类中的目标方法 `doSomething`
+
+![Spring-ABTransaction_JdkDynamicProxy.png](../../spring/ref/Spring-ABTransaction_JdkDynamicProxy.png)

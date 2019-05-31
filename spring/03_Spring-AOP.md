@@ -143,7 +143,7 @@ public class AopMain {
 
 2. 我们定义的这个切面 (aspect 注解的 bean)怎么被发现并应用到目标对象(businessService)
 
-第一个问题属于 spring ioc 的范围。关于自动扫描的内容参考 [Spring-ComponentScan.md](02_Spring-ComponentScan.md)。本文着重介绍 Spring 代理类的实现。
+第一个问题属于 spring ioc 的范围。关于自动扫描的内容参考 [Spring-ComponentScan.md](02_00_Spring-ComponentScan.md)。本文着重介绍 Spring 代理类的实现。
 
 我们看到 `PerformanceAnalysisInterceptor` 类的注解有两个 一个是 `@Component` 一个是`@Aspect` **Component**标签刚才已经解释过，说明这是一个 spring 的组件，已经注册到 spring 中，那 **Aspect** 注解呢？根据刚才的分析, 我们知道 spring 对于不同的标签采用不同的处理器，同理，这里 **Aspect** 也有对应的标签处理器,进过全局搜索，我们发现在 `AopNamespaceHandler` 中
 
