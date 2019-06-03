@@ -57,7 +57,7 @@ id sem consectetuer libero luctus adipiscing.
 缩进 4 个空格或是 1 个制表符
 
     这是一个代码区块。
-    
+
 这个每行一阶的缩进（4 个空格或是 1 个制表符），都会被移除
 
     tell application "Foo"
@@ -133,6 +133,8 @@ Please don't use any `<blink>` tags.
 [id]: url/to/image  "Optional title attribute"
 
 Markdown 还没有办法指定图片的宽高，如果你需要的话，你可以使用普通的 \<img\> 标签。
+如
+<img src="URL_TO_IMAGE" width = "400" height = "120" div align=left/>
 
 # 区段元素
 ### 链接
@@ -173,7 +175,7 @@ This is [an example] [id] reference-style link.
 下面这三种链接的定义都是相同：
 
 [foo]: http://example.com/  "Optional Title Here"
-[foo]: http://example.com/  (Optional Title Here)
+[foo]: http://example.com/  "Optional Title Here"
 网址定义只有在产生链接的时候用到，并不会直接出现在文件之中。
 
 隐式链接标记功能让你可以省略指定链接标记，这种情形下，链接标记会视为等同于链接文字，要用隐式链接标记只要在链接文字后面加上一个空的方括号，如果你要让 "Google" 链接到 google.com，你可以简化成：
@@ -222,4 +224,12 @@ Markdown 支持以比较简短的自动链接形式来处理网址和电子邮�
 |:---|---:|:---:|
 |张伟|28|男|
 |黄珊珊|28|女|
+
+
+
+# 数学公式
+
+![md_math_01.png](ref/md_math_01.png)
+
+![md_math_01.png](ref/md_math_02.png)
 
