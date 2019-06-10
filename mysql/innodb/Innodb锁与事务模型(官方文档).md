@@ -1,6 +1,6 @@
 原文地址: [InnoDB Transaction Model](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-model.html)
 
-In the `InnoDB` transaction model, the goal is to combine the best properties of a [multi-versioning](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_mvcc) database with traditional传统的 two-phase locking. `InnoDB` performs locking at the row level and runs queries as nonlocking [consistent reads](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_consistent_read) by default, in the style of Oracle. The lock information in `InnoDB` is stored space-efficiently so that lock escalation升级 is not needed. Typically, several users are permitted to lock every row in `InnoDB` tables, or any random subset of the rows, without causing `InnoDB` memory exhaustion耗尽.
+In the `InnoDB` transaction model, the goal is to combine the best properties of a [multi-versioning](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_mvcc) database with traditional传统的 two-phase locking. `InnoDB` **performs locking at the row level and runs queries as nonlocking [consistent reads](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_consistent_read) by default**, in the style of Oracle. The lock information in `InnoDB` is stored space-efficiently so that lock escalation升级 is not needed. Typically, several users are permitted to lock every row in `InnoDB` tables, or any random subset of the rows, without causing `InnoDB` memory exhaustion耗尽.
 
 > consistent read  一致读
 >
@@ -10,19 +10,16 @@ In the `InnoDB` transaction model, the goal is to combine the best properties of
 >
 > Consistent read is the default mode in which `InnoDB` processes `SELECT` statements in **READ COMMITTED** and **REPEATABLE READ** isolation levels. Because a consistent read does not set any locks on the tables it accesses, other sessions are free to modify those tables while a consistent read is being performed on the table.
 >
-> For technical details about the applicable isolation levels, see [Section 15.7.2.3, “Consistent Nonlocking Reads”](https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html).
->
-> See Also [concurrency](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_concurrency), [isolation level](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_isolation_level), [locking](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_locking), [READ COMMITTED](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_read_committed), [REPEATABLE READ](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_repeatable_read), [snapshot](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_snapshot), [transaction](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_transaction), [undo log](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_undo_log).
 
 #### 15.7.2.1 Transaction Isolation Levels
 
-Transaction isolation is one of the foundations基础 of database processing. Isolation is the I in the acronym缩写 [ACID](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_acid); the isolation level is the setting that fine-tunes微调 the balance between performance and reliability, consistency, and reproducibility of results when multiple transactions are making changes and performing queries at the same time.
+Transaction isolation is one of the foundations基础 of database processing. Isolation is the **I** in the acronym缩写 [ACID](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_acid); the isolation level is the setting that fine-tunes微调 the balance between performance and reliability, consistency, and reproducibility of results when multiple transactions are making changes and performing queries at the same time.
 
 `InnoDB` offers all four transaction isolation levels described by the SQL:1992 standard: `READ UNCOMMITTED`, `READ COMMITTED`, `REPEATABLE READ`, and`SERIALIZABLE`. **The default isolation level for `InnoDB` is** `REPEATABLE READ`.
 
 A user can change the isolation level for a single session or for all subsequent connections with the `SET TRANSACTION`statement. To set the server's default isolation level for all connections, use the `--transaction-isolation`option on the command line or in an option file..
 
-`InnoDB` supports each of the transaction isolation levels described here using different **locking** strategies. You can enforce a high degree of consistency with the default [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) level, for operations on crucial关键 data where [ACID](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_acid) compliance原则 is important. Or you can relax the consistency rules with [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) or even [`READ UNCOMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-uncommitted), in situations such as bulk reporting where precise consistency and repeatable results are less important than minimizing the amount of overhead for locking. [`SERIALIZABLE`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_serializable) enforces even stricter rules than [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read), and is used mainly in specialized situations, such as with [XA](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_xa) transactions and for troubleshooting issues with concurrency and [deadlocks](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_deadlock).
+> `InnoDB` supports each of the transaction isolation levels described here using different **locking** strategies. You can enforce a high degree of consistency with the default [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) level, for operations on crucial关键 data where [ACID](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_acid) compliance原则 is important. Or you can relax the consistency rules with [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) or even [`READ UNCOMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-uncommitted), in situations such as bulk reporting where precise consistency and repeatable results are less important than minimizing the amount of overhead for locking. [`SERIALIZABLE`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_serializable) enforces even stricter rules than [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read), and is used mainly in specialized situations, such as with [XA](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_xa) transactions and for troubleshooting issues with concurrency and [deadlocks](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_deadlock).
 
 The following list describes how MySQL supports the different transaction levels. The list goes from the most commonly used level to the least used.
 
@@ -34,16 +31,16 @@ The following list describes how MySQL supports the different transaction levels
   >
   > A representation of data at a particular time, which remains the same even as changes are **committed** by other **transactions**. Used by certain **isolation levels** to allow **consistent reads**.
 
-  For [locking reads](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_locking_read) ([`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) with `FOR UPDATE` or `FOR SHARE`), [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html), and [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) statements, locking depends on whether the statement uses a **unique** index with a unique search condition, or a range-type search condition.
+  <u>For [locking reads](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_locking_read) ([`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) with `FOR UPDATE` or `FOR SHARE`), [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html), and [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) statements</u>, locking depends on whether the statement uses a **unique** index with a unique search condition, or a range-type search condition.
 
   - For a unique index with a unique search condition, `InnoDB` locks only the index record found, not the [gap](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_gap) before it.
-  - For other search conditions, `InnoDB` locks the **index range scanned,** using [gap locks](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_gap_lock) or [next-key locks](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_next_key_lock) to block insertions by other sessions into the gaps间隙 **covered** by the range. For information about gap locks and next-key locks, see [Section 15.7.1, “InnoDB Locking”](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html).
+  - **For other search conditions, `InnoDB` locks the index range scanned, using [gap locks](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_gap_lock) or [next-key locks](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_next_key_lock) to block insertions by other sessions into the gaps间隙 covered by the range.** For information about gap locks and next-key locks, see [Section 15.7.1, “InnoDB Locking”](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html).
 
 - `READ COMMITTED`
 
   Each consistent read, even within the same transaction, sets and reads its own fresh snapshot设置和读取自己的新快照. For information about consistent reads, see [Section 15.7.2.3, “Consistent Nonlocking Reads”](https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html).
 
-  For locking reads ([`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) with `FOR UPDATE` or `FOR SHARE`), [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) statements, and [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) statements, `InnoDB` locks only index records, **not the gaps before them, and thus permits the free insertion of new records next to locked records.** Gap locking is only used for foreign-key constraint checking and duplicate-key checking.
+  For locking reads ([`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) with `FOR UPDATE` or `FOR SHARE`), [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) statements, and [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) statements, `InnoDB` locks **only** index records, **not the gaps before them, and thus permits the free insertion of new records next to locked records.** Gap locking is only used for foreign-key constraint checking and duplicate-key checking.
 
   Because gap locking is disabled, phantom幻影 problems may occur, as other sessions can insert new rows into the gaps. For information about phantoms, see [Section 15.7.4, “Phantom Rows”](https://dev.mysql.com/doc/refman/8.0/en/innodb-next-key-locking.html).
 
@@ -51,8 +48,8 @@ The following list describes how MySQL supports the different transaction levels
 
   Using `READ COMMITTED` has additional effects:
 
-  - For [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) or [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) statements, `InnoDB` holds locks **only** for rows that it updates or deletes. Record locks for nonmatching rows are released after MySQL has evaluated the `WHERE` condition. This greatly **reduces** the probability of deadlocks, but they can **still happen**.
-  - For [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) statements, if a row is already locked, `InnoDB` performs a “semi-consistent半一致” read, returning the latest committed version to MySQL so that MySQL can determine whether the row matches the `WHERE` condition of the [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html). If the row matches (must be updated), MySQL reads the row again and this time `InnoDB` either locks it or waits for a lock on it.
+  - **For [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) or [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) statements, `InnoDB` holds locks only for rows that it updates or deletes. Record locks for nonmatching rows are released after MySQL has evaluated the `WHERE` condition. This greatly reduces the probability of deadlocks, but they can still happen.**
+  - **For [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) statements, if a row is already locked, `InnoDB` performs a “semi-consistent半一致” read, returning the latest committed version to MySQL so that MySQL can determine whether the row matches the `WHERE` condition of the [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html). If the row matches (must be updated), MySQL reads the row again and this time `InnoDB` either locks it or waits for a lock on it.**
 
   Consider the following example, beginning with this table:
 
@@ -142,19 +139,18 @@ The following list describes how MySQL supports the different transaction levels
 
 #### 15.7.2.3 Consistent Nonlocking Reads
 
-A [consistent read](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_consistent_read) means that `InnoDB` uses multi-versioning to present to a **query a snapshot of the database at a point in time**. The query sees the changes made by transactions that committed before that point of time, and no changes made by later or uncommitted transactions. The exception to this rule is that the query sees the changes made by earlier statements within the same transaction. This exception causes the following anomaly: If you update some rows in a table, a [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) sees the latest version of the updated rows, but it might also see older versions of any rows. If other sessions simultaneously update the same table, the anomaly means that you might see the table in a state that never existed in the database.
+A [consistent read](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_consistent_read) means that `InnoDB` uses multi-versioning to present to a **query a snapshot of the database at a point in time**. The query sees the changes made by transactions that committed before that point of time, and no changes made by later or uncommitted transactions并且不会看到以后或未提交的事务所做的更改. The exception例外情况 to this rule is that the query sees the changes made by earlier statements within the same transaction. This exception causes the following anomaly异常: If you update some rows in a table, a [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) sees the latest version of the updated rows, but it might also see older versions of any rows. If other sessions simultaneously同时 update the same table, the anomaly means that you might see the table in a state that never existed in the database.异常意味着您可能会看到该表处于数据库中从未存在的状态。
 
-If the transaction [isolation level](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_isolation_level) is [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) (the default level), all consistent reads within the same transaction read the snapshot established by the first such read in that transaction. You can get a fresher snapshot for your queries by committing the current transaction and after that issuing new queries.
+**If the transaction [isolation level](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_isolation_level) is [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) (the default level), all consistent reads within the same transaction read the snapshot established by the first such read in that transaction. You can get a fresher snapshot for your queries by committing the current transaction and after that issuing new queries.**
 
-With [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) isolation level, each consistent read within a transaction sets and reads its own fresh snapshot.
+**With [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) isolation level, each consistent read within a transaction sets and reads its own fresh snapshot.**
 
-Consistent read is the default mode in which `InnoDB` processes [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) statements in [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) and [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) isolation levels. A consistent read does not set any locks on the tables it accesses, and therefore other sessions are free to modify those tables at the same time a consistent read is being performed on the table.
+Consistent read is the default mode in which `InnoDB` processes [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) statements in [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) and [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) isolation levels. <u>A consistent read **does not set any locks** on the tables it accesses, and therefore **other sessions are free to modify those tables** at the same time a consistent read is being performed on the table.</u>
 
 Suppose that you are running in the default [`REPEATABLE READ`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_repeatable-read) isolation level. When you issue a consistent read (that is, an ordinary [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html)statement), `InnoDB` gives your transaction a timepoint according to which your query sees the database. If another transaction deletes a row and commits after your timepoint was assigned, you do not see the row as having been deleted. Inserts and updates are treated similarly.
 
-Note
-
-The snapshot of the database state applies to [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) statements within a transaction, not necessarily to [DML](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_dml)statements. If you insert or modify some rows and then commit that transaction, a [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) or [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) statement issued from another concurrent `REPEATABLE READ` transaction could affect those just-committed rows, even though the session could not query them. If a transaction does update or delete rows committed by a different transaction, those changes do become visible to the current transaction. For example, you might encounter a situation like the following:
+> Note
+The snapshot of the database state applies to [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) statements within a transaction, **not necessarily to但是不适用于 [DML](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_dml) statements**. If you insert or modify some rows and then commit that transaction, a [`DELETE`](https://dev.mysql.com/doc/refman/8.0/en/delete.html) or [`UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/update.html) statement issued from another concurrent **`REPEATABLE READ`** transaction could affect those just-committed rows, **even though the session could not query them**. If a transaction does update or delete rows committed by a different transaction, those changes do become visible to the current transaction. For example, you might encounter a situation like the following:
 
 ```sql
 SELECT COUNT(c1) FROM t1 WHERE c1 = 'xyz';
@@ -170,9 +166,9 @@ SELECT COUNT(c2) FROM t1 WHERE c2 = 'cba';
 -- Returns 10: this txn can now see the rows it just updated.
 ```
 
-You can advance your timepoint by committing your transaction and then doing another [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) or [`START TRANSACTION WITH CONSISTENT SNAPSHOT`](https://dev.mysql.com/doc/refman/8.0/en/commit.html).
+<u>You can advance推进 your timepoint by **committing your transaction** and then doing another [`SELECT`](https://dev.mysql.com/doc/refman/8.0/en/select.html) or [`START TRANSACTION WITH CONSISTENT SNAPSHOT`](https://dev.mysql.com/doc/refman/8.0/en/commit.html).</u>
 
-This is called multi-versioned concurrency control.
+This is called **multi-versioned concurrency control.**
 
 In the following example, session A sees the row inserted by B only when B has committed the insert and A has committed as well, so that the timepoint is advanced past the commit of B.
 
@@ -200,18 +196,18 @@ v          SELECT * FROM t;
            ---------------------
 ```
 
-If you want to see the “freshest” state of the database, use either the [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) isolation level or a [locking read](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_locking_read):
+**If you want to see the “freshest” state of the database, use either the [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) isolation level or a [locking read](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_locking_read):**
 
 ```sql
 SELECT * FROM t FOR SHARE;
 ```
 
-With [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) isolation level, each consistent read within a transaction sets and reads its own fresh snapshot. With `FOR SHARE`, a locking read occurs instead: A `SELECT` blocks until the transaction containing the freshest rows ends (see [Section 15.7.2.4, “Locking Reads”](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html)).
+**With [`READ COMMITTED`](https://dev.mysql.com/doc/refman/8.0/en/innodb-transaction-isolation-levels.html#isolevel_read-committed) isolation level, each consistent read within a transaction sets and reads its own fresh snapshot. With `FOR SHARE`, a locking read occurs instead: A `SELECT` blocks until the transaction containing the freshest rows ends** (see [Section 15.7.2.4, “Locking Reads”](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html)).
 
 Consistent read does not work over certain DDL statements:
 
 - Consistent read does not work over [`DROP TABLE`](https://dev.mysql.com/doc/refman/8.0/en/drop-table.html), because MySQL cannot use a table that has been dropped and `InnoDB` destroys the table.
-- Consistent read does not work over [`ALTER TABLE`](https://dev.mysql.com/doc/refman/8.0/en/alter-table.html), because that statement makes a temporary copy of the original table and deletes the original table when the temporary copy is built. When you reissue a consistent read within a transaction, rows in the new table are not visible because those rows did not exist when the transaction's snapshot was taken. In this case, the transaction returns an error:[`ER_TABLE_DEF_CHANGED`](https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_table_def_changed), “Table definition has changed, please retry transaction”.
+- Consistent read does not work over [`ALTER TABLE`](https://dev.mysql.com/doc/refman/8.0/en/alter-table.html), because that statement makes a temporary copy of the original table and deletes the original table when the temporary copy is built. When you reissue重新发行 a consistent read within a transaction, rows in the new table are not visible because those rows did not exist when the transaction's snapshot was taken. In this case, the transaction returns an error:[`ER_TABLE_DEF_CHANGED`](https://dev.mysql.com/doc/refman/8.0/en/server-error-reference.html#error_er_table_def_changed), “Table definition has changed, please retry transaction”.
 
 The type of read varies for selects in clauses like [`INSERT INTO ... SELECT`](https://dev.mysql.com/doc/refman/8.0/en/insert.html), [`UPDATE ... (SELECT)`](https://dev.mysql.com/doc/refman/8.0/en/update.html), and [`CREATE TABLE ... SELECT`](https://dev.mysql.com/doc/refman/8.0/en/create-table.html) that do not specify `FOR UPDATE` or `FOR SHARE`:
 
@@ -224,25 +220,23 @@ If you query data and then insert or update related data within the same transac
 
 - [`SELECT ... FOR SHARE`](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 
-  Sets a shared mode lock on any rows that are read. Other sessions can read the rows, but cannot modify them until your transaction commits. If any of these rows were changed by another transaction that has not yet committed, your query waits until that transaction ends and then uses the latest values.
+  Sets a **shared mode lock** on any rows that are read. **Other sessions can read the rows, but cannot modify them until your transaction commits. If any of these rows were changed by another transaction that has not yet committed, your query waits until that transaction ends and then uses the latest values.**
 
-  Note
-
+  > Note
   `SELECT ... FOR SHARE` is a replacement for `SELECT ... LOCK IN SHARE MODE`, but `LOCK IN SHARE MODE`remains available for backward compatibility. The statements are equivalent. However, `FOR SHARE` supports `OF*table_name*`, `NOWAIT`, and `SKIP LOCKED` options. See [Locking Read Concurrency with NOWAIT and SKIP LOCKED](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html#innodb-locking-reads-nowait-skip-locked).
 
 - [`SELECT ... FOR UPDATE`](https://dev.mysql.com/doc/refman/8.0/en/select.html)
 
-  For index records the search encounters, locks the rows and any associated index entries, the same as if you issued an `UPDATE` statement for those rows. Other transactions are blocked from updating those rows, from doing `SELECT ... FOR SHARE`, or from reading the data in certain transaction isolation levels. Consistent reads ignore any locks set on the records that exist in the read view. (Old versions of a record cannot be locked; they are reconstructed by applying [undo logs](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_undo_log) on an in-memory copy of the record.)
+  **For index records the search encounters对于搜索遇到的索引记录, locks the rows and any associated index entries锁定行和任何关联的索引项**, the same as if you issued an `UPDATE` statement for those rows. Other transactions are blocked from updating those rows, from doing `SELECT ... FOR SHARE`, or from reading the data in certain transaction isolation levels. **Consistent reads ignore any locks set on the records that exist in the read view一致读取忽略在读取视图中存在的记录上设置的任何锁**. (Old versions of a record cannot be locked; they are reconstructed by applying [undo logs](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_undo_log) on an in-memory copy of the record.)
 
 These clauses are primarily useful when dealing with tree-structured or graph-structured data, either in a single table or split across multiple tables. You traverse edges or tree branches from one place to another, while reserving the right to come back and change any of these “pointer”values.
 
-All locks set by `FOR SHARE` and `FOR UPDATE` queries are released when the transaction is committed or rolled back.
+**All locks set by `FOR SHARE` and `FOR UPDATE` queries are released when the transaction is committed or rolled back.**
 
 Note
+**Locking reads are only possible when autocommit is disabled** (either by beginning transaction with [`START TRANSACTION`](https://dev.mysql.com/doc/refman/8.0/en/commit.html) or by setting [`autocommit`](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_autocommit) to 0.
 
-Locking reads are only possible when autocommit is disabled (either by beginning transaction with [`START TRANSACTION`](https://dev.mysql.com/doc/refman/8.0/en/commit.html) or by setting [`autocommit`](https://dev.mysql.com/doc/refman/8.0/en/server-system-variables.html#sysvar_autocommit) to 0.
-
-A locking read clause in an outer statement does not lock the rows of a table in a nested subquery unless a locking read clause is also specified in the subquery. For example, the following statement does not lock rows in table `t2`.
+**A locking read clause in an outer statement does not lock the rows of a table in a nested subquery <u>unless a locking read clause is also specified in the subquery</u>**. For example, the following statement does not lock rows in table `t2`.
 
 ```sql
 SELECT * FROM t1 WHERE c1 = (SELECT c1 FROM t2) FOR UPDATE;
