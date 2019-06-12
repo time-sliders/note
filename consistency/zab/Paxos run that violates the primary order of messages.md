@@ -1,0 +1,1 @@
+原文地址 [Paxos run that violates the primary order of messages](https://cwiki.apache.org/confluence/display/ZOOKEEPER/PaxosRun)
