@@ -1,0 +1,1 @@
+PropertyConfigurator.configure("log4j.properties"); 
