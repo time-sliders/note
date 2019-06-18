@@ -347,8 +347,8 @@ public Vote lookForLeader() throws InterruptedException {
                  */
                 switch (n.state) {
                 /*如果目标服务器也是 LOOKING 这里有2种情况，
-                	1. 这个选票是当前服务器自己发送给自己的
-                	2. 有多台机器同时在 LOOKING*/
+                	1. 这个选票是当前服务器自己发送给自己的（在sendNotifications 方法内部的确把发给自己的消息也放到队列了）
+                	2. 有多台机器同时在 LOOKING（很少会出现这种情况，但是还是有概率出现的，所以也要处理）*/
                 case LOOKING:  
                     // If notification > current, replace and send messages out
                     // 这里请参考下面的 附录：electionEpoch / logicalclock / peerEpoch的区别
@@ -368,6 +368,8 @@ public Vote lookForLeader() throws InterruptedException {
                         // 重新发送选票
                         sendNotifications();
                     } else if (n.electionEpoch < logicalclock.get()) {
+                      	/* 如果目标机器的选票比我们这台机器要小，说明发送这个投票的机器丢失了一部分选举消息，
+                      	可能是网络分片等原因，这里直接忽视掉这张投票就好了*/
                         if(LOG.isDebugEnabled()){
                             LOG.debug("Notification election epoch is smaller than logicalclock. n.electionEpoch = 0x"
                                     + Long.toHexString(n.electionEpoch)
@@ -376,7 +378,8 @@ public Vote lookForLeader() throws InterruptedException {
                         break;
                     } else if (totalOrderPredicate(n.leader, n.zxid, n.peerEpoch,
                             proposedLeader, proposedZxid, proposedEpoch)) {
-                      	// 如果目标选票比自己大，则更新自己的选票为目标选票，然后重新发起通知
+                      	/*走到这里说明目标机器 Epoch 与自己相同，是一张有效的投票，这里判断：
+                      	如果目标选票比自己大，则更新自己的选票为目标选票，然后重新发起投票变更的通知*/
                         updateProposal(n.leader, n.zxid, n.peerEpoch);
                         sendNotifications();
                     }
@@ -425,13 +428,15 @@ public Vote lookForLeader() throws InterruptedException {
                     break;
                 case FOLLOWING:
                 case LEADING:
-                    // 如果收到的选票是  FOLLOWING || LEADING 表示目标机器已经完成了选举
+                    /* 如果收到的选票是  FOLLOWING || LEADING 表示目标机器已经完成了选举
+                    绝大部分 zookeeper 启动加入集群时，大部分走的都是这一部分的代码*/
                     /*
                      * Consider all notifications from the same epoch
                      * together.
-                     * 这里表示，如果目标服务器也是新启动的服务器，而且已经拿到了选举结果
                      */
-                    if(n.electionEpoch == logicalclock.get()){
+                    if(n.electionEpoch == logicalclock.get()){ 
+                      /*目标机器也正在开始选举，这是一个极端场景，目标机器从 FOLLOWING || LEADING 
+                      刚刚进入选举状态，可能是由于分片等原因*/
                         recvset.put(n.sid, new Vote(n.leader, n.zxid, n.electionEpoch, n.peerEpoch));
                         if(termPredicate(recvset, new Vote(n.leader,
                                         n.zxid, n.electionEpoch, n.peerEpoch, n.state))
@@ -556,7 +561,7 @@ private void sendNotifications() {
 > [0614 11:28:45 701 DEBUG] [QuorumPeer[myid=1](plain=/0:0:0:0:0:0:0:0:2181)(secure=disabled)] server.quorum.FastLeaderElection - **Sending Notification: 1 (n.leader), 0x200000004 (n.zxid), 0x1 (n.round), 2 (recipient), 1 (myid), 0x3 (n.peerEpoch)**
 > [0614 11:28:45 701 DEBUG] [QuorumPeer[myid=1](plain=/0:0:0:0:0:0:0:0:2181)(secure=disabled)] server.quorum.FastLeaderElection - **Sending Notification: 1 (n.leader), 0x200000004 (n.zxid), 0x1 (n.round), 3 (recipient), 1 (myid), 0x3 (n.peerEpoch)**
 
-
+全序断言，下面这个方法用来比较2张选票的大小
 
 ```java
 /**
@@ -586,6 +591,8 @@ protected boolean totalOrderPredicate(long newId, long newZxid, long newEpoch, l
             ((newZxid > curZxid) || ((newZxid == curZxid) && (newId > curId)))));
 }
 ```
+
+termPredicate 判断是否已经选举结束
 
 ```java
 /**
@@ -643,7 +650,7 @@ QuorumMaj
  * from votingMembers
  */
 public boolean containsQuorum(Set<Long> ackSet) { 
-    return (ackSet.size() > half); // half = 1
+    return (ackSet.size() > half); // if 3：half = 1 这里可以看到至少大于 1/2即，3台中至少要有2台
 }
 ```
 
@@ -695,7 +702,4 @@ QuorumCnxManager 会与其他服务器交互，将 Notification 发送过去，�
 
 ## electionEpoch / logicalclock / peerEpoch的区别
 
-**electionEpoch **和 **logicalclock** 的区别在于，**electionEpoch **指的是发出 Notification 的server 的 **logicalclock**，而 **logicalclock** 则指的是当前 Server 所处的选举的轮次，每次调用 **lookForLeader()** 方法，它的值都会加一． 而对于一个新加入的机器来说，logicalclock 初始化为 0，如果加入成功，则会被设置为跟集群的机器保持一致
-
-**electionEpoch** 和 **peerEpoch** 的区别在于，**electionEpoch** 记录的选举的轮次，而 **peerEpoch** 则指的是当前leader 的任期．什么意思呢？
-想象这样一种情景，一个 Server 处于网络分区的状态，它会不断调用 **lookForLeader()** 方法来寻找 leader，上面我们也介绍过，每次调用 **lookForLeader()** 方法，**logicalclock** 的值都会加一，所以这台 Server 就会不断地向外发送**electionEpoch** 逐渐增加，而 **peerEpoch** 不变的 notification．直到网络分区恢复，并成功找到了一台leader．
+**electionEpoch **和 **logicalclock** 的区别在于，**electionEpoch **指的是发出 Notification 的server 的 **logicalclock**，而 **logicalclock** 则指的是当前 Server 所处的选举的轮次，每次调用 **lookForLeader()** 方法，它的值都会加一． 而对于一个新加入的机器来说，logicalclock 初始化为 0，如果加入成功，则会被设置为跟集群的机器保持一致。**electionEpoch** 和 **peerEpoch** 的区别在于，**electionEpoch** 记录的选举的轮次，而 **peerEpoch** 则指的是当前leader 的任期。

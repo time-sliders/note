@@ -3,7 +3,6 @@
 This is a short overview of **a totally ordered broadcast protocol** used by ZooKeeper, called Zab. It is conceptually easy to understand, is easy to implement, and gives high performance. In this paper we present the requirements ZooKeeper makes on Zab, we show how the protocol is used, and we give an overview of how the protocol works.  				 			 		
 这是一个关于ZooKeeper正在使用的全序广播协议（Zab）的简短概述。它在概念上很容易理解，也很容易实现，并且提供很高的性能。在这篇文章里，我们会呈现ZooKeeper在Zab上的需求，也会展示这个协议该如何使用，然后我们总体概述一下这个协议是如何工作的。
 
-
 #1. INTRODUCTION
 
 At Yahoo! we have developed a high-performance highly- available coordination service called ZooKeeper [9] that allows large scale applications to perform coordination tasks such as **leader election, status propagation, and rendezvous**. This service implements a hierarchical space of data nodes, called **znodes**, that clients use to implement their coordination tasks. We have found the service to be flexible with performance that easily meets the production demands of the web-scale, mission critical applications we have at Yahoo!. **ZooKeeper foregoes locks and instead implements wait-free shared data objects with strong guarantees on the order of operations over these objects.** Client libraries take advantage of these guarantees to implement their coordination tasks. In general, one of the main premises of ZooKeeper is that **order of updates is more important to applications than other typical coordination techniques such as blocking**. 
