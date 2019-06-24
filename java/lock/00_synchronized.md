@@ -4,7 +4,7 @@
 
 [Synchronization](https://docs.oracle.com/javase/specs/jls/se12/html/jls-17.html#jls-17.1) 
 
-The Java programming language provides multiple mechanisms for communicating between threads. The most basic of these methods is *synchronization*, which is implemented using ***monitors***. **Each object in Java is associated with a monitor, which a thread can *lock* or *unlock***. Only one thread at a time may hold a lock on a monitor. Any other threads attempting to lock that monitor are blocked until they can obtain a lock on that monitor. A thread *t* may lock a particular monitor multiple times; each unlock reverses the effect of one lock operation.
+The Java programming language provides multiple mechanisms for communicating between threads. The most basic of these methods is ***synchronization***, which is implemented using ***monitors***. **Each object in Java is associated with a monitor, which a thread can *lock* or *unlock***. Only one thread at a time may hold a lock on a monitor. Any other threads attempting to lock that monitor are blocked until they can obtain a lock on that monitor. A thread *t* may lock a particular monitor multiple times; each **unlock** reverses the effect of one **lock** operation.
 
 The `synchronized` statement computes a **reference to an object**; it then attempts to perform a lock action **on that object's monitor** and does not proceed further`进一步执行` until the lock action has successfully completed. After the lock action has been performed, the body of the `synchronized` statement is executed. If execution of the body is ever completed, either normally`正常地` or abruptly`突然地`, an `unlock` action is automatically performed on that same monitor.
 
@@ -20,7 +20,7 @@ Every object, in addition to having an associated monitor, has an associated *wa
 
 When an object is first created, its wait set is empty. Elementary actions`基础操作` that add threads to and remove threads from wait sets are atomic`原子性的`. Wait sets are manipulated`控制` solely`单独` through the methods`Object.wait`, `Object.notify`, and `Object.notifyAll`.
 
-**Wait set manipulations can also be affected by the interruption status of a thread**, and by the `Thread` class's methods dealing with interruption. Additionally`另外`, the `Thread` class's methods for sleeping and joining other threads have properties derived`来源` from those of wait and notification actions.
+**Wait set manipulations操作 can also be affected by the interruption status of a thread**, and by the `Thread` class's methods dealing with interruption. Additionally`另外`, the `Thread` class's methods for sleeping and joining other threads have properties derived`来源` from those of wait and notification actions.
 
 ## 14.19. The `synchronized` Statement
 
