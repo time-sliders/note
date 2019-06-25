@@ -110,122 +110,7 @@ Raft 是一种用来管理第 2 章中提到的复制日志的算法。表-2 为
 
 <img src="ref/raft-figure-2.png" align="center" height='700px'/>
 
-**状态：**
-
-在所有服务器上持久存在的：（在响应远程过程调用 RPC 之前稳定存储的）
-
-| 名称        | 描述                                                         |
-| ----------- | ------------------------------------------------------------ |
-| currentTerm | 服务器最后知道的任期号（从0开始递增）                        |
-| votedFor    | 在当前任期内收到选票的候选人 id（如果没有就为 null）         |
-| log[]       | 日志条目；每个条目包含状态机的要执行命令和从领导人处收到时的任期号 |
-
-在所有服务器上不稳定存在的：
-
-| 名称        | 描述                                              |
-| ----------- | ------------------------------------------------- |
-| commitIndex | 已知的被提交的最大日志条目的索引值（从0开始递增） |
-| lastApplied | 被状态机执行的最大日志条目的索引值（从0开始递增） |
-
-在领导人服务器上不稳定存在的：（在选举之后初始化的）
-
-| 名称         | 描述                                                         |
-| ------------ | ------------------------------------------------------------ |
-| nextIndex[]  | 对于每一个服务器，记录需要发给它的下一个日志条目的索引（初始化为领导人上一条日志的索引值+1） |
-| matchIndex[] | 对于每一个服务器，记录已经复制到该服务器的日志的最高索引值（从0开始递增） |
-
-**附加日志远程过程调用 （AppendEntries RPC）**
-
-由领导人来调用复制日志（5.3节）；也会用作heartbeat
-
-| 参数         | 描述                                                         |
-| ------------ | ------------------------------------------------------------ |
-| term         | 领导人的任期号                                               |
-| leaderId     | 领导人的 id，为了其他服务器能重定向到客户端                  |
-| prevLogIndex | 最新日志之前的日志的索引值                                   |
-| prevLogTerm  | 最新日志之前的日志的领导人任期号                             |
-| entries[]    | 将要存储的日志条目（表示 heartbeat 时为空，有时会为了效率发送超过一条） |
-| leaderCommit | 领导人提交的日志条目索引值                                   |
-
-| 返回值  | 描述                                                         |
-| ------- | ------------------------------------------------------------ |
-| term    | 当前的任期号，用于领导人更新自己的任期号                     |
-| success | 如果其它服务器包含能够匹配上 prevLogIndex 和 prevLogTerm 的日志时为真 |
-
-接受者需要实现：
-
-1. 如果 `term < currentTerm`返回 false（5.1节）
-2. 如果在`prevLogIndex`处的日志的任期号与`prevLogTerm`不匹配时，返回 false（5.3节）
-3. 如果一条已经存在的日志与新的冲突（index 相同但是任期号 term 不同），则删除已经存在的日志和它之后所有的日志（5.3节）
-4. 添加任何在已有的日志中不存在的条目
-5. 如果`leaderCommit > commitIndex`，将`commitIndex`设置为`leaderCommit`和最新日志条目索引号中较小的一个
-
-**投票请求 RPC（RequestVote RPC）**
-
-由候选人发起收集选票（5.2节）
-
-| 参数         | 描述                           |
-| ------------ | ------------------------------ |
-| term         | 候选人的任期号                 |
-| candidateId  | 请求投票的候选人 id            |
-| lastLogIndex | 候选人最新日志条目的索引值     |
-| lastLogTerm  | 候选人最新日志条目对应的任期号 |
-
-| 返回值      | 描述                             |
-| ----------- | -------------------------------- |
-| term        | 目前的任期号，用于候选人更新自己 |
-| voteGranted | 如果候选人收到选票为 true        |
-
-接受者需要实现：
-
-1. 如果`term < currentTerm`返回 false（5.1节）
-2. 如果`votedFor`为空或者与`candidateId`相同，并且候选人的日志和自己的日志一样新，则给该候选人投票（5.2节 和 5.4节）
-
-**服务器需要遵守的规则：**
-
-所有服务器：
-
-- 如果`commitIndex > lastApplied`，`lastApplied`自增，将`log[lastApplied]`应用到状态机（5.3节）
-- 如果 RPC 的请求或者响应中包含一个 term T 大于 `currentTerm`，则`currentTerm`赋值为 T，并切换状态为追随者（Follower）（5.1节）
-
-追随者（followers）: 5.2节
-
-- 响应来自候选人和领导人的 RPC
-- 如果在超过选取领导人时间之前没有收到来自当前领导人的`AppendEntries RPC`或者没有收到候选人的投票请求，则自己转换状态为候选人
-
-候选人：5.2节
-
-- 转变为选举人之后开始选举：
-  - `currentTerm`自增
-  - 给自己投票
-  - 重置选举计时器
-  - 向其他服务器发送`RequestVote RPC`
-- 如果收到了来自大多数服务器的投票：成为领导人
-- 如果收到了来自新领导人的`AppendEntries RPC（heartbeat）`：转换状态为追随者
-- 如果选举超时：开始新一轮的选举
-
-领导人：
-
-- 一旦成为领导人：向其他所有服务器发送空的`AppendEntries RPC（heartbeat）`;在空闲时间重复发送以防止选举超时（5.2节）
-
-- 如果收到来自客户端的请求：向本地日志增加条目，在该条目应用到状态机后响应客户端（5.3节）
-
-- 对于一个追随者来说，如果上一次收到的日志索引大于将要收到的日志索引（nextIndex）：通过 AppendEntries RPC 将 nextIndex 之后的所有日志条目发送出去
-
-  - 如果发送成功：将该追随者的 `nextIndex`和`matchIndex`更新
-  - 如果由于日志不一致导致`AppendEntries RPC`失败：`nextIndex`递减并且重新发送（5.3节）
-
-- 如果存在一个满足`N > commitIndex`和`matchIndex[i] >= N`并且`log[N].term == currentTerm`的 N，则将`commitIndex`赋值为 N
-
 <img src="ref/raft-figure-3.png" height="300px" align='center'/>
-
-| 性质                                   | 描述                                                         |
-| -------------------------------------- | ------------------------------------------------------------ |
-| 选举安全原则（Election Safety）        | 一个任期（term）内最多允许有一个领导人被选上（5.2节）        |
-| 领导人只增加原则（Leader Append-Only） | 领导人永远不会覆盖或者删除自己的日志，它只会增加条目         |
-| 日志匹配原则（Log Matching）           | 如果两个日志在相同的索引位置上的日志条目的任期号相同，那么我们就认为这个日志从头到这个索引位置之间的条目完全相同（5.3 节） |
-| 领导人完全原则（Leader Completeness)   | 如果一个日志条目在一个给定任期内被提交，那么这个条目一定会出现在所有任期号更大的领导人中 |
-| 状态机安全原则（State Machine Safety） | 如果一个服务器已经将给定索引位置的日志条目应用到状态机中，则所有其他服务器不会在该索引位置应用不同的条目（5.4.3节） |
 
 Raft implements consensus by first electing a distinguished ***leader***, then giving the leader complete responsibility for managing the replicated log. The leader accepts log entries from clients, replicates them on other servers, and tells servers when it is safe to apply log entries to their state machines. Having a leader simplifies the management of the replicated log. For example, the leader can decide where to place new entries in the log without consulting other servers, and data flows in a simple fashion from the leader to other servers. A leader can fail or be- come disconnected from the other servers, in which case a new leader is elected. 
 Raft 通过首先选出一个领导人来实现一致性，然后给予领导人完全管理复制日志（replicated log）的责任。领导人接收来自客户端的日志条目，并把它们复制到其他的服务器上，领带人还要告诉服务器们什么时候将日志条目应用到它们的状态机是安全的。通过选出领导人能够简化复制日志的管理工作。例如，领导人能够决定将新的日志条目放到哪，而并不需要和其他的服务器商议，数据流被简化成从领导人流向其他服务器。如果领导人宕机或者和其他服务器失去连接，就可以选取下一个领导人。
@@ -354,54 +239,301 @@ Raft 通过比较日志中最后一个条目的索引和任期号来决定两个
 
 ### 5.4.2 Committing entries from previous terms	提交之前任期的日志条目
 
-As described in Section 5.3, a leader knows that an entry from its current term is committed once that entry is stored on a majority of the servers. If a leader crashes before committing an entry, future leaders will attempt to finish replicating the entry. However, a leader cannot immediately conclude that an entry from a previous term is committed once it is stored on a majority of servers. Figure 8 illustrates a situation where an old log entry is stored on a majority of servers, yet can still be overwritten by a future leader. 
+As described in Section 5.3, a leader knows that an entry from its current term is committed once that entry is stored on a majority of the servers. If a leader crashes before committing an entry, future leaders will attempt to finish replicating the entry. However, **a leader cannot immediately conclude that an entry from a previous term is committed once it is stored on a majority of servers**. Figure 8 illustrates a situation where an old log entry is stored on a majority of servers, yet can still be overwritten by a future leader. 
 正如 5.3节 中描述的那样，只要一个日志条目被存在了在多数的服务器上，领导人就知道当前任期就可以提交该条目了。如果领导人在提交之前就崩溃了，之后的领导人会试着继续完成对日志的复制。然而，领导人并不能马上断定上一个任期的条目已经被提交了，直到条目已经被大多数服务器存储。图-8 说明了一种情况，一条存储在了大多数服务器上的日志条目仍然被新上任的领导人覆盖了。
 
 <img src='ref/raft-figure-8.png' height='400px' align='center'/>
 
-> 图-8：如图的时间序列说明了为什么领导人不能通过之前任期的日志条目判断它的提交状态。（a）中的 S1 是领导人并且部分复制了索引2上的日志条目。（b）中 S1 崩溃了；S5 通过 S3，S4 和自己的选票赢得了选举，并且在索引2上接收了另一条日志条目。（c）中 S5 崩溃了，S1 重启了，通过 S2，S3 和自己的选票赢得了选举，并且继续索引2处的复制，这时任期2的日志条目已经在大部分服务器上完成了复制，但是还并没有提交。如果在（d）时刻 S1 崩溃了，S5 会通过 S2，S3，S4 的选票成为领导人，然后用它自己在任期3的日志条目覆盖掉其他服务器的日志条目。然而，如果在崩溃之前，S1 在它的当前任期在大多数服务器上复制了一条日志条目，就像在（e）中那样，那么这条条目就会被提交（S5就不会赢得选举）。在这时，之前的日志条目就会正常被提交。
+> 图-8：如图的时间序列说明了为什么领导人不能通过之前任期的日志条目判断它的提交状态。（a）中的 S1 是领导人并且部分复制了位置为2的日志条目。（b）中 S1 崩溃了；S5 通过 S3，S4 和自己的选票赢得了选举，并且在索引2上接收了另一条日志条目。（c）中 S5 崩溃了，S1 重启了，通过 S2，S3 和自己的选票赢得了选举，并且继续索引2处的复制，这时任期2的日志条目已经在大部分服务器上完成了复制，但是还并没有提交。如果在（d）时刻 S1 崩溃了，S5 会通过 S2，S3，S4 的选票成为领导人，然后用它自己在任期3的日志条目覆盖掉其他服务器的日志条目。然而，如果在崩溃之前，S1 在它的当前任期在大多数服务器上复制了一条日志条目，就像在（e）中那样，那么这条条目就会被提交（S5就不会赢得选举）。在这时，之前的日志条目就会正常被提交。
 
-To eliminate problems like the one in Figure 8, Raft never commits log entries from previous terms by count- ing replicas. Only log entries from the leader’s current term are committed by counting replicas; once an entry from the current term has been committed in this way, then all prior entries are committed indirectly because of the Log Matching Property. There are some situations where a leader could safely conclude that an older log en- try is committed (for example, if that entry is stored on ev- ery server), but Raft takes a more conservative approach for simplicity. 
-为了消除 图-8 中描述的问题，Raft 从来不会通过计算复制的数目来提交之前人气的日志条目。只有领导人当前任期的日志条目才能通过计算数目来进行提交。一旦当前任期的日志条目以这种方式被提交，那么由于日志匹配原则（Log Matching Property），之前的日志条目也都会被间接的提交。在某些情况下，领导人可以安全的知道一个老的日志条目是否已经被提交（例如，通过观察该条目是否存储到所有服务器上），但是 Raft 为了简化问题使用了一种更加保守的方法。
+To eliminate problems like the one in Figure 8, **Raft never commits log entries from previous terms by counting replicas. Only log entries from the leader’s current term are committed by counting replicas**; once an entry from the current term has been committed in this way, then all prior entries are committed indirectly because of the Log Matching Property. There are some situations where a leader could safely conclude that an older log entry is committed (for example, if that entry is stored on every server), but Raft takes a more conservative approach for simplicity. 
+为了消除 图-8 中描述的问题，Raft 从来不会通过计算副本的数目来提交之前任期的日志条目。只有领导人当前任期的日志条目才能通过计算副本数来进行提交。一旦当前任期的日志条目以这种方式被提交，那么由于日志匹配原则（Log Matching Property），所有更早的日志条目也都会被间接的提交。在某些情况下，领导人可以安全的知道一个老的日志条目是否已经被提交（例如，如果条目已经储到了每个服务器），但是 Raft 为了简化问题使用了一种更加保守的方法。
 
-Raft incurs this extra complexity in the commitment rules because log entries retain their original term num- bers when a leader replicates entries from previous terms. In other consensus algorithms, if a new leader re- replicates entries from prior “terms,” it must do so with its new “term number.” Raft’s approach makes it easier to reason about log entries, since they maintain the same term number over time and across logs. In addition, new leaders in Raft send fewer log entries from previous terms than in other algorithms (other algorithms must send re- dundant log entries to renumber them before they can be committed).  	
+Raft incurs遭受 this extra complexity in the commitment rules because **log entries retain their original term numbers when a leader replicates entries from previous terms**. In other consensus algorithms, if a new leader re-replicates entries from prior “terms,” it must do so with its new “term number.” Raft’s approach makes it easier to reason about log entries, since they **maintain the same term number over time and across logs**. In addition, new leaders in Raft send fewer log entries from previous terms than in other algorithms (other algorithms must send redundant log entries to renumber them before they can be committed).  	
 因为当领导人从之前任期复制日志条目时日志条目保留了它们最开始的任期号，所以这使得 Raft 在提交规则中增加了额外的复杂性。在其他的一致性算法中，如果一个新的领导人要从之前的任期中复制日志条目，它必须要使用当前的新任期号。Raft 的方法使得判断日志更加容易，因为它们全程都保持着同样的任期号。另外，和其它的一致性算法相比，Raft 算法中的新领导人会发送更少的之前任期的日志条目（其他算法必须要发送冗余的日志条目并且在它们被提交之前来重新排序）。
 
 ### 5.4.3 Safety argument
 
-<img src='ref/raft-figure-9.png' height='200px' align='center'/>
+Given the complete Raft algorithm, we can now argue more precisely that the **Leader Completeness Property** holds (this argument is based on the safety proof; see Section 9.2). We assume that the Leader Completeness Property does not hold, then we prove a contradiction. Suppose the leader for term T (leaderT) commits a log entry from its term, but that log entry is not stored by the leader of some future term. Consider the smallest term U > T whose leader (leaderU) does not store the entry. 
+根据完整的 Raft 算法，现在我们能够更精确的证明领导人完全原则成立（Leader Completeness)（这基于 9.2节 提出的安全性证明）。我们假定领导人完全原则是不成立的，然后推导出矛盾。假定任期 T 的领导人 leaderT在它的任期提交了一个日志条目，但是这条日志条目并没有存储在之后的任期中的领导人上。我们设大于 T 的最小的任期 U 的领导人（leaderU） 没有存储这条日志条目。
 
-> 图-9：如果 S1（任期 T 的领导人）在它的任期提交了一条日志条目，并且 S5 在之后的任期 U 成为了领导人，那么最少会有一台服务器（S3）接收了这条日志条目并且会给 S5 投票。
+1. The committed entry must have been absent from不在 leaderU’s log at the time of its election (leaders never delete or overwrite entries). 
+  在 leaderU 选举时一定没有那条被提交的日志条目（领导人从来不会删除或者覆盖日志条目）。
 
-Given the complete Raft algorithm, we can now ar- gue more precisely that the Leader Completeness Prop- erty holds (this argument is based on the safety proof; see Section 9.2). We assume that the Leader Completeness Property does not hold, then we prove a contradiction. Suppose the leader for term T (leaderT) commits a log entry from its term, but that log entry is not stored by the leader of some future term. Consider the smallest term U > T whose leader (leaderU) does not store the entry. 
-给出了完整的 Raft 算法，现在我们能够更精确的论证领导人完全原则（Leader Completeness)（这基于 9.2节 提出的安全性证明）。我们假定领导人完全原则是不成立的，然后推导出矛盾。假定任期 T 的领导人 leaderT在它的任期提交了一个日志条目，但是这条日志条目并没有存储在之后的任期中的领导人上。我们设大于 T 的最小的任期 U 的领导人（leaderU） 没有存储这条日志条目。
+2. leaderT replicated the entry on a majority of the cluster, and leaderU received votes from a majority of the cluster. Thus, at least one server (“the voter”) both accepted the entry from leaderT and voted for leaderU, as shown in Figure 9. The voter is key to reaching a contradiction. 
+  leaderT 复制了这个条目到集群的大多数的服务器上。因此，至少有一台服务器（投票者）既接收了来自 leaderT 的日志条目并且给 leaderU 投票，就像 图-9 中所示那样。这个投票者是产生矛盾的关键。
 
-1. The committed entry must have been absent from leaderU’s log at the time of its election (leaders never delete or overwrite entries). 
-在 leaderU 选举时一定没有那条被提交的日志条目（领导人从来不会删除或者覆盖日志条目）。
-2. leaderT replicated the entry on a majority of the clus- ter, and leaderU received votes from a majority of the cluster. Thus, at least one server (“the voter”) both accepted the entry from leaderT and voted for leaderU, as shown in Figure 9. The voter is key to reaching a contradiction. 
-leaderT 复制了这个条目到集群的大多数的服务器上。因此，只是有一台服务器（投票者）即接收了来自 leaderT 的日志条目并且给 leaderU 投票，就像 图-9 中所示那样。这个投票者是产生矛盾的关键。
+  <img src="ref/raft-figure-9.png" height='200px' align='center'/>
+
+  > 图-9：如果 S1（任期 T 的领导人）在它的任期提交了一条日志条目，并且 S5 在之后的任期 U 成为了领导人，那么最少会有一台服务器（S3）接收了这条日志条目并且会给 S5 投票。
+
 3. The voter must have accepted the committed entry from leaderT *before* voting for leaderU; otherwise it would have rejected the AppendEntries request from leaderT (its current term would have been higher than T). 
-投票者必须在给 leaderU 投票之前接收来自 leaderT 的日志条目；否则它会拒绝来自 leaderT 的 AppendEntries 请求（它的当前任期会比 T 要大）
+  投票者必须在给 leaderU 投票之前接收来自 leaderT 的日志条目；否则它会拒绝来自 leaderT 的 AppendEntries 请求（它的当前任期会比 T 要大）
+
 4. The voter still stored the entry when it voted for leaderU, since every intervening leader contained the entry (by assumption), leaders never remove entries, and followers only remove entries if they conflict with the leader. 
-投票者会在它给 leaderU 投票时存储那个条目，因为任何中间的领导人都保有该条目（基于假设），领导人从来不会移除这个条目，并且追随者也只会在和领导人冲突时才会移除日志条目。
+  投票者会在它给 leaderU 投票时存储那个条目，因为任何中间的领导人都保有该条目（基于假设），领导人从来不会移除这个条目，并且追随者也只会在和领导人冲突时才会移除日志条目。
+
 5. The voter granted its vote to leaderU, so leaderU’s log must have been as up-to-date as the voter’s. This leads to one of two contradictions. 
-投票者给 leaderU 投票了，所以 leaderU 的日志必须和投票者的一样新。这就导致了一个矛盾
+  投票者给 leaderU 投票了，所以 leaderU 的日志必须和投票者的一样新。这就导致了一个矛盾
+
 6. First, if the voter and leaderU shared the same last log term, then leaderU’s log must have been at least as long as the voter’s, so its log contained every entry in the voter’s log. This is a contradiction, since the voter contained the committed entry and leaderU was assumed not to. 
-首先，如果投票者和 leaderU 最后一条日志条目的任期号相同，那么 leaderU 的日志一定和投票者的一样长，因此它的日志包含全部投票者的日志条目。这是矛盾的，因为在假设中投票者和 leaderU 包含的已提交条目是不同的。
-7. Otherwise, leaderU’s last log term must have been larger than the voter’s. Moreover, it was larger than T, since the voter’s last log term was at least T (it con- tains the committed entry from term T). The earlier leader that created leaderU’s last log entry must have contained the committed entry in its log (by assump- tion). Then, by the Log Matching Property, leaderU’s log must also contain the committed entry, which is a contradiction. 
-除此之外， leaderU 的最后一条日志的任期号一定比投票者的大。另外，它也比 T 要大，因为投票者的最后一条日志条目的任期号最小也要是 T（它包含了所有任期 T 提交的日志条目）。创建 leaderU 最后一条日志条目的上一任领导人必须包含已经提交的日志条目（基于假设）。那么，根据日志匹配原则（Log Matching），leaderU 也一定包含那条提交的日志条目，这也是矛盾的。
-8. This completes the contradiction. Thus, the leaders of all terms greater than T must contain all entries from term T that are committed in term T. 
-这时就完成了矛盾推导。因此，所有比任期 T 大的领导人一定包含所有在任期 T 提交的日志条目。
+  首先，如果投票者和 leaderU 最后一条日志条目的任期号相同，那么 leaderU 的日志一定和投票者的一样长，因此它的日志包含全部投票者的日志条目。这是矛盾的，因为在假设中投票者和 leaderU 包含的已提交条目是不同的。
+
+7. Otherwise, leaderU’s last log term must have been larger than the voter’s. Moreover, it was larger than T, since the voter’s last log term was at least T (it contains the committed entry from term T). The earlier leader that created leaderU’s last log entry must have contained the committed entry in its log (by assumption). Then, by the Log Matching Property, leaderU’s log must also contain the committed entry, which is a contradiction. 
+  除此之外， leaderU 的最后一条日志的任期号一定比投票者的大。另外，它也比 T 要大，因为投票者的最后一条日志条目的任期号最小也要是 T（它包含了所有任期 T 提交的日志条目）。创建 leaderU 最后一条日志条目的上一任领导人必须包含已经提交的日志条目（基于假设）。那么，根据日志匹配原则（Log Matching），leaderU 也一定包含那条提交的日志条目，这也是矛盾的。
+
+8. This completes the contradiction. Thus, **the leaders of all terms greater than T must contain all entries from term T that are committed in term T.** 
+  这时就完成了矛盾推导。因此，所有比任期 T 大的领导人一定包含所有在任期 T 提交的日志条目。
+
 9. The Log Matching Property guarantees that future leaders will also contain entries that are committed indirectly, such as index 2 in Figure 8(d). 
-日志匹配原则（Log Matching）保证了未来的领导人也会包含被间接提交的日志条目，就像 图-8 中（d）时刻索引为2的条目。
+  日志匹配原则（Log Matching）保证了未来的领导人也会包含被间接提交的日志条目，就像 图-8 中（d）时刻索引为2的条目。
 
 Given the Leader Completeness Property, we can prove the State Machine Safety Property from Figure 3, which states that if a server has applied a log entry at a given index to its state machine, no other server will ever apply a different log entry for the same index. At the time a server applies a log entry to its state machine, its log must be identical to the leader’s log up through that entry and the entry must be committed. Now consider the lowest term in which any server applies a given log index; the Log Completeness Property guarantees that the leaders for all higher terms will store that same log entry, so servers that apply the index in later terms will apply the same value. Thus, the State Machine Safety Property holds.
-通过给出了 领导人完全原则（Leader Completeness)，我们能够证明 表-3 中的状态机安全原则（State Machine Safety），状态机安全原则（State Machine Safety）讲的是如果一台服务器将给定索引上的日志条目应用到了它自己的状态机上，其它服务器的同一索引位置不可能应用的是其它条目。在一个服务器应用一条日志条目到它自己的状态机中时，它的日志必须和领导人的日志在该条目和之前的条目上相同，并且已经被提交。现在我们来考虑在任何一个服务器应用一个指定索引位置的日志的最小任期；日志完全特性（Log Completeness Property）保证拥有更高任期号的领导人会存储相同的日志条目，所以之后的任期里应用某个索引位置的日志条目也会是相同的值。因此，状态机安全特性是成立的。
+根据领导人完全原则（Leader Completeness)，我们能够证明 表-3 中的状态机安全原则（State Machine Safety），状态机安全原则（State Machine Safety）讲的是如果一台服务器将给定索引上的日志条目应用到了它自己的状态机上，其它服务器的同一索引位置不可能应用的是其它条目。在一个服务器应用一条日志条目到它自己的状态机中时，它的日志必须和领导人的日志在该条目和之前的条目上相同，并且已经被提交。现在我们来考虑在任何一个服务器应用一个指定索引位置的日志的最小任期；日志完全特性（Log Completeness Property）保证拥有更高任期号的领导人会存储相同的日志条目，所以之后的任期里应用某个索引位置的日志条目也会是相同的值。因此，状态机安全特性是成立的。
 
-Finally, Raft requires servers to apply entries in log in- dex order. Combined with the State Machine Safety Prop- erty, this means that all servers will apply exactly the same set of log entries to their state machines, in the same order. 
+Finally, Raft requires servers to apply entries in log index order. Combined with the State Machine Safety Property, this means that all servers will apply exactly the same set of log entries to their state machines, in the same order. 
 最后，Raft 算法需要服务器按照日志中索引位置顺序应用日志条目。和状态机安全特性结合起来看，这就意味着所有的服务器会应用相同的日志序列集到自己的状态机中，并且是按照相同的顺序。
 
 ## 5.5 Follower and candidate crashes 追随者和候选人崩溃
 
-Until this point we have focused on leader failures. Fol- lower and candidate crashes are much simpler to han- dle than leader crashes, and they are both handled in the same way. If a follower or candidate crashes, then fu- ture RequestVote and AppendEntries RPCs sent to it will fail. Raft handles these failures by retrying indefinitely; if the crashed server restarts, then the RPC will complete successfully. If a server crashes after completing an RPC but before responding, then it will receive the same RPC again after it restarts. Raft RPCs are idempotent, so this causes no harm. For example, if a follower receives an AppendEntries request that includes log entries already present in its log, it ignores those entries in the new re- quest.  
-截止到目前，我们只讨论了领导人崩溃的问题。追随者和候选人崩溃的问题解决起来要比领导人崩溃要简单得多，这两者崩溃的处理方式是一样的。如果一个追随者或者候选人崩溃了，那么之后的发送给它的 RequestVote RPC 和 AppendEntries RPC 会失败。Raft 通过无限的重试来处理这些失败；如果崩溃的服务器重启了，RPC 就会成功完成。如果一个服务器在收到了 RPC 之后但是在响应之前崩溃了，那么它会在重启之后再次收到同一个 RPC。因为 Raft 中的 RPC 都是幂等的，因此不会有什么问题。例如，如果一个追随者收到了一个已经包含在它的日志中的 AppendEntries 请求，它会忽视这个新的请求。
+Until this point we have focused on leader failures. Follower and candidate crashes are much simpler to handle than leader crashes, and they are both handled in the same way. If a follower or candidate crashes, then future RequestVote and AppendEntries RPCs sent to it will fail. Raft handles these failures by **retrying indefinitely**; if the crashed server restarts, then the RPC will complete successfully. If a server crashes after completing an RPC but before responding, then it will receive the same RPC again after it restarts. **Raft RPCs are idempotent**, so this causes no harm. For example, if a follower receives an AppendEntries request that includes log entries already present in its log, it ignores those entries in the new request. 
+截止到目前，我们讨论了领导人崩溃的问题。追随者和候选人崩溃的问题解决起来要比领导人崩溃要简单得多，这两者崩溃的处理方式是一样的。如果一个追随者或者候选人崩溃了，那么之后的发送给它的 RequestVote RPC 和 AppendEntries RPC 会失败。Raft 通过无限的重试来处理这些失败；如果崩溃的服务器重启了，RPC 就会成功完成。如果一个服务器在收到了 RPC 之后但是在响应之前崩溃了，那么它会在重启之后再次收到同一个 RPC。因为 Raft 中的 RPC 都是幂等的，因此不会有什么问题。例如，如果一个追随者收到了一个已经包含在它的日志中的 AppendEntries 请求，它会忽视这个新的请求。
+
+## 5.6 Timing and availability 时序和可用性
+
+One of our requirements for Raft is that **safety must not depend on timing**: the system must not produce incorrect results just because some event happens more quickly or slowly than expected. However, availability (the ability of the system to respond to clients in a timely manner) must inevitably depend on timing. For example, if message exchanges take longer than the typical time between server crashes, candidates will not stay up long enough to win an election; without a steady leader, Raft cannot make progress. 
+我们对于 Raft 的要求之一就是安全性不依赖于时序（timing）：系统不能仅仅因为一些事件发生的比预想的快一些或慢一些就产生错误。然而，可用性（系统可以及时响应客户端的特性）不可避免的要依赖时序。例如，如果消息交换的时间比服务器崩溃间隔的时间还要多，候选人没有足够的时间来赢得选举；没有一个稳定的领导人，Raft 将无法工作。
+
+Leader election is the aspect of Raft where timing is most critical. Raft will be able to elect and maintain a steady leader as long as the system satisfies the following *timing requirement*: 
+领导人选取是 Raft 中对时序要求最关键的地方。Raft 会选出并且保持一个稳定的领导人只有系统满足下列时序要求（timing requirement）：
+
+**$$broadcastTime ≪ electionTimeout ≪ MTBF $$**
+
+In this inequality *broadcastTime* is the average time it takes a server to send RPCs in parallel to every server in the cluster and receive their responses; *electionTimeout* is the election timeout described in Section 5.2; and *MTBF* is the average time between failures for a single server. **The broadcast time should be an order of magnitude less than the election timeout so that leaders can reliably send the heartbeat messages required to keep followers from starting elections; given the randomized approach used for election timeouts, this inequality also makes split votes unlikely. The election timeout should be a few orders of magnitude less than MTBF so that the system makes steady progress. When the leader crashes, the system will be unavailable for roughly the election timeout; we would like this to represent only a small fraction of overall time.**
+在这个不等式中，broadcastTime指的是一台服务器并行的向集群中的其他服务器发送 RPC 并且收到它们的响应的平均时间；electionTimeout指的就是在 5.2节 描述的选举超时时间；MTBF指的是单个服务器发生故障的间隔时间的平均数(Mean Time between Failures)。broadcastTime应该比electionTimeout小一个数量级，为的是使领导人能够持续发送心跳信息（heartbeat）来阻止追随者们开始选举；根据已经给出的随机化选举超时时间方法，这个不等式也使得瓜分选票的情况变成不可能。electionTimeout也要比MTBF小几个数量级，为的是使得系统稳定运行。当领导人崩溃时，整个大约会在electionTimeout的时间内不可用；我们希望这种情况仅占全部时间的很小的一部分。
+
+The broadcast time and MTBF are properties of the underlying system, while the electionTimeout is something we must choose. Raft’s RPCs typically require the recipient to persist information to stable storage, so the broadcast time may range from 0.5ms to 20ms, depending on storage technology. As a result, **the election timeout is likely to be somewhere between 10ms and 500ms.** Typical server MTBFs are several months or more, which easily satisfies the timing requirement.
+broadcastTime和MTBF是由系统决定的性质，但是electionTimeout是我们必须做出选择的。Raft 的 RPC 需要接收方将信息持久化的保存到稳定存储中去，所以广播时间大约是 0.5 毫秒到 20 毫秒，这取决于存储的技术。因此，electionTimeout一般在 10ms 到 500ms 之间。大多数的服务器的MTBF都在几个月甚至更长，很容易满足这个时序需求。
+
+# 6 Cluster membership changes 集群成员调整
+
+Up until now we have assumed that the cluster *configuration* (the set of servers participating in the consensus algorithm) is fixed. In practice, it will occasionally be necessary to change the configuration, for example to replace servers when they fail or to change the degree of replication. Although this can be done by taking the entire cluster off-line, updating configuration files, and then restarting the cluster, this would leave the cluster unavailable during the changeover. In addition, if there are any manual steps, they risk operator error. In order to avoid these issues, we decided to automate configuration changes and incorporate them into the Raft consensus algorithm. 
+截止到目前，我们都假定集群的配置（加入到一致性算法的服务器集合）是固定的。在实际中，我们会经常更改配置，例如，替换掉那些崩溃的机器或者更改复制级别。虽然通过关闭整个集群，升级配置文件，然后重启整个集群也可以解决这个问题，但是这回导致在更改配置的过程中，整个集群不可用。另外，如果存在需要手工操作，那么就会有操作失误的风险。为了避免这些问题，我们决定采用自动改变配置并且把这部分加入到了 Raft 一致性算法中。
+
+For the configuration change mechanism to be safe, there must be no point during the transition where it is possible for two leaders to be elected for the same term. Unfortunately, <u>any approach where servers switch directly from the old configuration to the new configuration is unsafe. It isn’t possible to atomically switch all of the servers at once, so the cluster can potentially **split into two independent majorities during the transition**</u> (see Figure 10). 
+为了让配置修改机制能够安全，那么在转换的过程中在任何时间点两个领导人不能再同一个任期被同时选为领导人。不幸的是，服务器集群从旧的配置直接升级到新的配置的任何方法都是不安全的，一次性自动的转换所有服务器是不可能的，所以集群可以在转换的过程中划分成两个单独的组（如 图-10 所示）。
+
+<img src='ref/raft-figure-10.png' align='center' height='300px'>
+
+> 图-10：从一个配置切换到另一个配置是不安全的，因为不同的服务器会在不同的时间点进行切换。在这个例子中，集群数量从三台转换成五台。不幸的是，在一个时间点有两个服务器能被选举成为领导人，一个是在使用旧的配置的机器中（$C_{old}$）选出的领导人，另一个领导人是通过新的配置（$C_{new}$）选出来的。
+
+In order to ensure safety, **configuration changes must use a two-phase approach**. There are a variety of ways to implement the two phases. For example, some systems (e.g., [22]) use the first phase to disable the old configuration so it cannot process client requests; then the second phase enables the new configuration. **In Raft the cluster first switches to a transitional configuration we call *joint consensus*; once the joint consensus has been committed, the system then transitions to the new configuration. The joint consensus combines both the old and new configurations:** 
+为了保证安全性，集群配置的调整必须使用两阶段（two-phase）方法。有许多种实现两阶段方法的实现。例如，一些系统在第一个阶段先把旧的配置设为无效使得它无法处理客户端请求，然后在第二阶段启用新的配置。在 Raft 中，集群先切换到一个过渡配置，我们称其为联合一致（joint consensus）；一旦联合一致被提交了，然后系统再切换到新的配置。联合一致是旧的配置和新的配置的组合：
+
+* Log entries are replicated to all servers in both configurations. 
+日志条目被复制给集群中新、老配置的所有服务器。
+* Any server from either configuration may serve as leader.
+新、老配置的服务器都能成为领导人。
+* Agreement (for elections and entry commitment) requires separate majorities from ***both*** the old and new configurations. 
+	需要分别在两种配置上获得大多数的支持才能达成一致（针对选举和提交）
+
+The joint consensus allows individual servers to transition between configurations at different times without compromising safety. Furthermore, joint consensus allows the cluster to continue servicing client requests throughout the configuration change. 
+联合一致允许独立的服务器在不影响安全性的前提下，在不同的时间进行配置转换过程。此外，联合一致可以让集群在配置转换的过程中依然能够响应服务器请求。
+
+<img src="ref/raft-figure-11.png" height='300px'>
+
+> 图-11：集群配置变更的时间线。虚线表示的是已经被创建但是还没提交的配置条目，实线表示的是最新提交的配置条目。领导人首先在它的日志中创建 $C_{old,new}$配置条目并且将它提交到$C_{old,new}$（使用旧配置的大部分服务器和使用新配置的大部分服务器）。然后创建它创建$C_{new}$配置条目并且将它提交到使用新配置的大部分机器上。这样就不存在$C_{old}$和$C_{new}$能够分别同时做出决定的时刻。
+
+Cluster configurations are stored and communicated using special entries in the replicated log; Figure 11 illustrates the configuration change process. When the leader receives a request to change the configuration from $C_{old}$ to $C_{new}$, it stores the configuration for joint consensus ($C_{old,new}$ in the figure) as a log entry and replicates that entry using the mechanisms described previously. Once a given server adds the new configuration entry to its log, it uses that configuration for all future decisions (**a server always uses the latest configuration in its log, regardless of whether the entry is committed**). This means that the leader will use the rules of $C_{old,new}$ to determine when the log entry for $C_{old,new}$ is committed. If the leader crashes, a new leader may be chosen under either $C_{old}$ or $C_{old,new}$, depending on whether the winning candidate has received $C_{old,new}$. In any case,  $C_{new}$ cannot make unilateral decisions during this period.
+集群配置是用特殊的日志条目在复制日志的过程中完成通信和存储；图-11 展示了配置变更的过程。当一个领导人接收到一个改变配置 $C_{old}$ 为 $C_{new}$ 的请求，它会为了联合一致以前面描述的日志条目和副本的形式将配置存储起来（图中的 $C_{old,new}$）。一旦一个服务器将新的配置日志条目增加到它的日志中，它就会用这个配置来做出未来所有的决定（服务器总是使用最新的配置，无论它是否已经被提交）。这意味着领导人要使用 $C_{old,new}$ 的规则来决定日志条目 $C_{old,new}$ 什么时候需要被提交。如果领导人崩溃了，被选出来的新领导人可能是使用 $C_{old}$ 配置也可能是 $C_{old,new}$ 配置，这取决于赢得选举的候选人是否已经接收到了 $C_{old,new}$ 配置。在任何情况下， $C_{new}$ 配置在这一时期都不会单方面的做出决定。
+
+Once $C_{old,new}$ has been committed, neither $C_{old}$ nor  $C_{new}$ can make decisions without approval of the other, and the Leader Completeness Property ensures that only servers with the $C_{old,new}$ log entry can be elected as leader. It is now safe for the leader to create a log entry describing  $C_{new}$ and replicate it to the cluster. Again, this configuration will take effect on each server as soon as it is seen. When the new configuration has been committed under the rules of  $C_{new}$, the old configuration is irrelevant and servers not in the new configuration can be shut down. As shown in Figure 11, there is no time when $C_{old}$ and  $C_{new}$ can both make unilateral decisions; this guarantees safety. 
+一旦 $C_{old,new}$ 被提交，那么无论是 $C_{old}$ 还是 $C_{new}$，在没有经过对方批准的情况下都不可能做出决定，并且领导人完全特性（Leader Completeness Property）保证了只有拥有 $C_{old,new}$ 日志条目的服务器才有可能被选举为领导人。这个时候，领导人创建一条关于 $C_{new}$ 配置的日志条目并复制给集群就是安全的了。另外，每个服务器在收到新的配置的时候就会立即生效。当新的配置在 $C_{new}$的规则下被提交，旧的配置就变得无关紧要，同时不使用新的配置的服务器就可以被关闭了。如 图-11，$C_{old}$ 和 $C_{new}$ 没有任何机会同时做出单方面的决定；这就保证了安全性。
+
+There are three more issues to address for reconfiguration. The first issue is that new servers may not initially store any log entries. If they are added to the cluster in this state, it could **take quite a while for them to catch up**, during which time it might not be possible to commit new log entries. In order to avoid availability gaps, Raft introduces an additional phase before the configuration change, in which the **new servers join the cluster as non-voting members** (the leader replicates log entries to them, but they are not considered for majorities). Once the new servers have caught up with the rest of the cluster, the reconfiguration can proceed as described above. 
+针对重新配置提出了三个问题。第一个问题是一开始的时候新的服务器可能没有任何日志条目。如果它们在这个状态下加入到集群中，那么它们需要一段时间来更新追赶，在这个阶段它们还不能提交新的日志条目。为了避免这种可用性的间隔时间，Raft 在配置更新的时候使用了一种额外的阶段，在这个阶段，新的服务器以没有投票权的身份加入到集群中来（领导人复制日志给他们，但是不把它们考虑到大多数中）。一旦新的服务器追赶上了集群中的其它机器，重新配置可以像上面描述的一样处理。
+
+The second issue is that the **cluster leader may not be part of the new configuration**. In this case, the leader steps down (returns to follower state) once it has committed the  $C_{new}$ log entry. This means that there will be a period of time (while it is committing  $C_{new}$ ) when the leader is managing a cluster that does not include itself; it replicates log entries but does not count itself in majorities. The leader transition occurs when  $C_{new}$ is committed because this is the first point when the new configuration can operate independently (it will always be possible to choose a leader from  $C_{new}$ ). Before this point, it may be the case that only a server from $C_{old}$ can be elected leader. 
+第二个问题是，集群的领导人可能不是新配置的一员。在这种情况下，领导人就会在提交了 $C_{new}$日志之后退位（回到跟随者状态）。这意味着有这样的一段时间（即领导人提交$C_{new}$ 的时候），领导人管理着集群，但是不包括自己；它复制日志但是不把它自己看作是大多数之一。当 $C_{new}$ 被提交时，会发生领导人过渡，因为这时是新的配置可以独立工作的最早的时间点（总是能够在 $C_{new}$ 配置下选出新的领导人）。在此之前，可能只能从 $C_{old}$ 中选出领导人。
+
+The third issue is that **removed servers (those not in  $C_{new}$) can disrupt the cluster**. These servers will not receive heartbeats, so they will **time out and start new elections**. They will then send RequestVote RPCs with new term numbers, and this will cause the current leader to revert to follower state. A new leader will eventually be elected, but the removed servers will time out again and the process will repeat, resulting in poor availability. 
+第三个问题是，移除不在 $C_{new}$ 中的服务器可能会扰乱集群。这些服务器将不会再接收到心跳（heartbeat），所以当选举超时时，它们就会进行新的选举过程。它们会发送带有新的任期号的 RequestVote RPC，这样会导致当前的领导人回退成跟随者状态。新的领导人最终会被选出来，但是被移除的服务器将会再次超时，然后这个过程会再次重复，导致整体可用性大幅降低。
+
+To prevent this problem, **servers disregard RequestVote RPCs when they believe a current leader exists**. Specifically, **if a server receives a RequestVote RPC within the minimum election timeout of hearing from a current leader, it does not update its term or grant its vote**. This does not affect normal elections, where **each server waits at least a minimum election timeout before starting an election**. However, it helps avoid disruptions from removed servers: if a leader is able to get heartbeats to its cluster, then it will not be deposed by larger term numbers. 
+为了避免这个问题，当服务器确认当前领导人存在时，服务器会忽略 RequestVote RPC。特别的，当服务器在当前最小选举超时时间内收到一个 RequestVote RPC，它不会更新当前的任期号或者投出选票。这不会影响正常的选举，每个服务器在开始一次选举之前，至少等待一个最小选举超时时间。然而，这有利于避免被移除的服务器扰乱：如果领导人能够发送心跳给集群，那么它就不会被更大的任期号废除。
+
+# 7 Log compaction
+
+Raft’s log grows during normal operation to incorporate并入，吸收 more client requests, but in a practical system, it cannot grow without bound. As the log grows longer, it occupies more space and takes more time to replay. This will eventually cause availability problems without some mechanism to discard obsolete information that has accumulated in the log. 
+Raft 产生的日志在持续的正常操作中不断增长，但是在实际的系统中，它不会无限的增长下去。随着日志的不断增长，它会占据越来越多的空间并且花费更多的时间重放（replay）。如果没有一个机制使得它能够废弃在日志中不断累积的过时的信息就会引起可用性问题。
+
+**Snapshotting** is the simplest approach to compaction. **In snapshotting, the entire current system state is written to a *snapshot* on stable storage, then the entire log up to that point is discarded**. Snapshotting is used in Chubby and ZooKeeper, and the remainder of this section describes snapshotting in Raft. 
+快照（snapshot）是最简单的压缩方式。在快照中，全部的当前系统状态都被写入到快照中，存储到持久化的存储中，然后在那个时刻之前的全部日志都可以被丢弃。在 Chubby 和 ZooKeeper 中都使用了快照技术，这一章的剩下的部分会介绍 Raft 中使用的快照技术。
+
+Incremental approaches to compaction, such as log cleaning [36] and log-structured merge trees [30, 5], are also possible. **These operate on a fraction of the data at once, so they spread the load of compaction more evenly均匀地 over time**. They first select a region of data that has accumulated many deleted and overwritten objects, then they rewrite the live objects from that region more compactly and free the region. This requires significant显著的 additional mechanism and complexity compared to snapshotting, which simplifies the problem by always operating on the entire data set. While log cleaning would require modifications to Raft, state machines can implement LSM trees using the same interface as snapshotting. 
+增量压缩（incremental approaches）的方法，例如日志清理（log cleaning）或者日志结构合并树（log-structured merge trees），都是可行的。这些方法每次只对一小部分数据进行操作，这样就分散了压缩的负载压力。首先，他们先选择一个已经积累的大量已经被删除或者被覆盖对象的区域，然后以更加紧密的方式重写那个区域还活跃的对象，之后释放那个区域。和简单操作整个数据集合的快照相比，需要显著增加额外的机制和复杂地快照比对来实现。状态机可以使用和快照相同的接口来实现 LSM tree ，但是日志清除方法就需要修改 Raft 了。
+
+<img src='ref/raft-figure-12.png' height='300px'>
+
+> 图-12：一个服务器用新的快照替换了从 1 到 5 的条目，快照值存储了当前的状态。快照中包含了最后的索引位置和任期号。
+
+Figure 12 shows the basic idea of snapshotting in Raft. **Each server takes snapshots independently, covering just the committed entries in its log.** Most of the work consists of the state machine writing its **current state** to the snapshot. Raft also includes a small amount of **metadata** in the snapshot: the ***last included index*** is the index of the last entry in the log that the snapshot replaces (the last entry the state machine had applied), and the ***last included term*** is the term of this entry. These are preserved to support the AppendEntries consistency check for the first log entry following the snapshot, since that entry needs a previous log index and term. To enable cluster membership changes (Section 6), the snapshot also includes the **latest configuration** in the log as of last included index. Once a server completes writing a snapshot, it may delete all log entries up through the last included index, as well as any prior snapshot. 
+图-12 展示了 Raft 中快照的基础思想。每个服务器独立的创建快照，只包括已经被提交的日志。主要的工作包括将状态机的状态写入到快照中。Raft 也将一些少量的元数据包含到快照中：最后被包含的索引（last included index）指的是被快照取代的最后的条目在日志中的索引值（状态机最后应用的日志），最后被包含的任期（last included term）指的是该条目的任期号。保留这些数据是为了支持快照之后的第一个条目的附加日志请求时的一致性检查，因为这个条目需要前一个条目的索引值和任期号。为了支持集群成员更新（第 6 章），快照中也将最后的一次配置作为最后一个条目存下来。一旦服务器完成一次快照，他就可以删除最后索引位置之前的所有日志和快照了。
+
+Although servers normally take snapshots independently, the leader must occasionally send snapshots to followers that lag behind. **This happens when the leader has already discarded the next log entry that it needs to send to a follower**. Fortunately, this situation is unlikely in normal operation: a follower that has kept up with the leader would already have this entry. However, an exceptionally slow follower or a new server joining the cluster (Section 6) would not. **The way to bring such a follower up-to-date is for the leader to send it a snapshot over the network.** 
+尽管通常服务器都是独立的创建快照，但是领导人必须偶尔的发送快照给一些落后的跟随者。这通常发生在当领导人已经丢弃了下一条需要发送给跟随者的日志条目的时候。幸运的是这种情况不是常规操作：一个与领导人保持同步的跟随者通常都会有这个条目。然而一个运行非常缓慢的跟随者或者新加入集群的服务器（第 6 章）将不会有这个条目。这时让这个跟随者更新到最新的状态的方式就是通过网络把快照发送给它们。
+
+<img src='ref/raft-figure-13.png' height='600px'>
+
+> 表-13：InstallSnapshot RPC 的总结。为了便于传输，快照都是被分成分块的；每个分块都给了跟随者生存的信号，所以跟随者可以重置选举超时计时器。
+
+The leader uses a new RPC called **InstallSnapshot** to send snapshots to followers that are too far behind; see Figure 13. When a follower receives a snapshot with this RPC, it must decide what to do with its existing log entries. Usually the snapshot will contain new information not already in the recipient’s log. In this case, the follower discards its entire log; it is all superseded by the snapshot and may possibly have uncommitted entries that conflict with the snapshot. If instead相反地 the follower receives a snapshot that describes a prefix of its log (due to retransmission or by mistake), then log entries covered by the snapshot are deleted but entries following the snapshot are still valid and must be retained. 
+在这种情况下领导人使用一种叫做安装快照（InstallSnapshot）的新的 RPC 来发送快照给太落后的跟随者；见 表-13。当跟随者通过这种 RPC 接收到快照时，它必须自己决定对于已经存在的日志该如何处理。通常快照会包含没有在接收者日志中存在的信息。在这种情况下，跟随者直接丢弃它所有的日志；这些会被快照所取代，但是可能会和没有提交的日志产生冲突。相反如果接收到的快照是自己日志的前面部分（由于网络重传或者错误），那么被快照包含的条目将会被全部删除，但是快照之后的条目必须是正确的和并且被保留下来。
+
+This snapshotting approach departs from Raft’s strong leader principle, since followers can take snapshots without the knowledge of the leader. However, we think this departure is justified. While having a leader helps avoid conflicting decisions in reaching consensus, **consensus has already been reached when snapshotting, so no decisions conflict**. Data still only flows from leaders to followers, just followers can now reorganize their data.
+这种快照的方式背离了 Raft 的强领导人原则（strong leader principle），因为跟随者可以在不知道领导人情况下创建快照。但是我们认为这种背离是值得的。领导人的存在，是为了解决在达成一致性的时候的冲突，但是在创建快照的时候，一致性已经达成，这时不存在冲突了，所以没有领导人也是可以的。数据依然是从领导人传给跟随者，只是跟随者可以重新组织它们的数据了。
+
+We considered an alternative leader-based approach in which only the leader would create a snapshot, then it would send this snapshot to each of its followers. However, this has two disadvantages. First, sending the snapshot to each follower would waste network bandwidth and slow the snapshotting process. Each follower already has the information needed to produce its own snapshots, and it is typically much cheaper for a server to produce a snapshot from its local state than it is to send and receive one over the network. Second, the leader’s implementation would be more complex. For example, the leader would need to send snapshots to followers in parallel with replicating new log entries to them, so as not to block new client requests.
+我们考虑过一种替代的基于领导人的快照方案，即只有领导人创建快照，然后发送给所有的跟随者。但是这样做有两个缺点。第一，发送快照会浪费网络带宽并且延缓了快照处理的时间。每个跟随者都已经拥有了所有产生快照需要的信息，而且很显然，自己从本地的状态中创建快照比通过网络接收别人发来的要经济。第二，领导人的实现会更加复杂。例如，领导人需要发送快照的同时并行的将新的日志条目发送给跟随者，这样才不会阻塞新的客户端请求。
+
+There are two more issues that impact snapshotting performance. First, **servers must decide when to snapshot**. If a server snapshots too often, it wastes disk bandwidth and energy; if it snapshots too infrequently, it risks exhausting its storage capacity, and it increases the time required to replay the log during restarts. **One simple strategy is to take a snapshot when the log reaches a fixed size in bytes**. If this size is set to be significantly larger than the expected size of a snapshot, then the disk bandwidth overhead for snapshotting will be small. 
+还有两个问题影响了快照的性能。首先，服务器必须决定什么时候应该创建快照。如果快照创建的过于频繁，那么就会浪费大量的磁盘带宽和其他资源；如果创建快照频率太低，它就要承受耗尽存储容量的风险，同时也增加了重启时的日志重建时间。一个简单的策略就是当日志大小达到一个固定大小的时候就创建一次快照。如果这个阈值设置的显著大于期望的快照的大小，那么快照对磁盘压力的影响就会很小了。
+
+The second performance issue is that writing a snapshot can take a significant amount of time, and we do not want this to delay normal operations. The solution is to use **copy-on-write** techniques so that new updates can be accepted without impacting the snapshot being writ- ten. For example, state machines built with functional data structures naturally support this. Alternatively, the operating system’s copy-on-write support (e.g., fork on Linux) can be used to create an in-memory snapshot of the entire state machine (our implementation uses this approach). 
+第二个影响性能的问题就是写入快照需要花费显著的一段时间，并且我们还不希望影响到正常操作。解决方案是通过写时复制（copy-on-write）的技术，这样新的更新就可以被接收而不影响到快照。例如，具有函数式数据结构的状态机天然支持这样的功能。另外，操作系统的写时复制技术的支持（如 Linux 上的 fork）可以被用来创建完整的状态机的内存快照（我们的实现就是这样的）。
+
+# 8 Client interaction 客户端交互
+
+This section describes how clients interact with Raft, including how clients find the cluster leader and how Raft supports linearizable semantics [10]. These issues apply to all consensus-based systems, and Raft’s solutions are similar to other systems.
+这一节将介绍客户端是如何和 Raft 进行交互的，包括客户端是如何发现领导人的和 Raft 是如何支持线性化语义（linearizable semantics）的。这些问题对于所有基于一致性的系统都存在，并且 Raft 的解决方案和其他的也差不多。
+
+**Clients of Raft send all of their requests to the leader**. When a client first starts up, it connects to a randomlychosen server. If the client’s first choice is not the leader, that server will reject the client’s request and supply information about the most recent leader it has heard from (AppendEntries requests include the network address of the leader). If the leader crashes, client requests will time out; clients then try again with randomly-chosen servers.
+Raft 中的客户端将所有请求发送给领导人。当客户端启动的时候，它会随机挑选一个服务器进行通信。如果客户端第一次挑选的服务器不是领导人，那么那个服务器会拒绝客户端的请求并且提供它最近接收到的领导人的信息（附加条目请求包含了领导人的网络地址）。如果领导人已经崩溃了，那么客户端的请求就会超时；客户端之后会再次重试随机挑选服务器的过程。
+
+Our goal for Raft is to implement linearizable semantics (each operation appears to execute instantaneously, exactly once, at some point between its invocation and its response). However, as described so far Raft can execute a command multiple times: for example, if the leader crashes after committing the log entry but before responding to the client, the client will retry the command with a new leader, causing it to be executed a second time. **The solution is for clients to <u>assign unique serial numbers</u> to every command**. Then, the state machine tracks the latest serial number processed for each client, along with the associated response. If it receives a command whose serial number has already been executed, it responds immediately without re-executing the request.
+我们 Raft 的目标是要实现线性化语义（linearizable semantics）（每一次操作立即执行，在它调用和收到回复之间只执行一次）。但是，如上述所说，Raft 是可以多次执行同一条命令的：例如，如果领导人在提交了这条日志之后，但是在响应客户端之前崩溃了，那么客户端会和新的领导人重试这条指令，导致这条命令就被再次执行了。解决方案就是客户端对于每一条指令都赋予一个唯一的序列号。然后，状态机跟踪每条指令最新的序列号和相应的响应。如果接收到一条指令，它的序列号已经被执行了，那么就立即返回结果，而不重新执行指令。
+
+Read-only operations can be handled without writing anything into the log. However, with no additional measures, this would run the risk of returning stale data, since the leader responding to the request might have been superseded by a newer leader of which it is unaware. Linearizable reads must not return stale data, and Raft needs two extra precautions to guarantee this without using the log. First, **a leader must have the latest information on which entries are committed.** <u>The Leader Completeness Property guarantees that a leader has all committed entries, but at the start of its term, it may not know which those are. To find out, it needs to commit an entry from its term. Raft handles this by having each leader commit a blank *no-op* entry into the log at the start of its term</u>. Second, **a leader must check whether it has been deposed before processing a read-only request** (its information may be stale if a more recent leader has been elected). <u>Raft handles this by having the leader exchange heartbeat messages with a majority of the cluster before responding to read-only requests.</u> Alternatively, <u>the leader could rely on the heartbeat mechanism to provide a form of lease</u> [9], but this would rely on timing for safety (it assumes bounded clock skew).
+只读（read-only）的操作可以直接处理而不需要记录日志。但是，在不增加任何限制的情况下，这么做可能会冒着返回过期数据(stale data)的风险，因为领导人响应客户端请求时可能已经被新的领导人作废了，但是它还不知道。线性化的读操作必须不能返回过期数据，Raft 需要使用两个额外的措施在不使用日志的情况下保证这一点。首先，领导人必须有关于被提交日志的最新信息。领导人完全原则（Leader Completeness Property）保证了领导人一定拥有所有已经被提交的日志条目，但是在它任期开始的时候，它可能不知道哪些是已经被提交的。为了知道这些信息，它需要在它的任期里提交一条日志条目。Raft 中通过领导人在任期开始的时候提交一个空白的没有任何操作的日志条目到日志中去来进行实现。第二，领导人在处理只读的请求之前必须检查自己是否已经被废除了（如果一个更新的领导人被选举出来，它自己的信息就已经过期了）。Raft 中通过让领导人在响应只读请求之前，先和集群中的大多数节点交换一次心跳（heartbeat）信息来处理这个问题。另外，领导人可以依赖心跳机制来实现一种租约的机制，但是这种方法依赖时序来保证安全性（它假设时间误差是有界的）。
+
+# 9 Implementation and evaluation 实现和评价
+
+The remainder of this section evaluates Raft using three criteria: understandability, correctness, and performance. 
+这一章会从三个方面来评估 Raft 算法：可理解性、正确性和性能。
+
+## 9.1 Understandability
+
+...
+
+## 9.2 Correctness
+
+...
+
+## 9.3 Performance
+
+Raft’s performance is similar to other consensus algorithms such as Paxos. The most important case for performance is when an established leader is replicating new log entries. Raft achieves this using the minimal number of messages (a single round-trip from the leader to half the cluster). It is also possible to further improve Raft’s performance. For example, it easily supports batching and pipelining requests for higher throughput and lower latency. Various optimizations have been proposed in the literature for other algorithms; many of these could be applied to Raft, but we leave this to future work. 
+Raft 和其他一致性算法例如 Paxos 有着差不多的性能。在性能方面，最重要的关注点是，当领导人被选举成功时，什么时候复制新的日志条目。Raft 通过很少数量的消息包（一轮从领导人到集群半数机器的消息）就达成了这个目的。同时，进一步提升 Raft 的性能也是可行的。例如，很容易通过支持批量操作和管道操作来提高吞吐量和降低延迟。对于其他一致性算法已经提出过很多性能优化方案；其中有很多也可以应用到 Raft 中来，但是我们暂时把这个问题放到未来的工作中去。
+
+We used our Raft implementation to measure the performance of Raft’s leader election algorithm and answer two questions. First, does the election process converge quickly? Second, what is the minimum downtime that can be achieved after leader crashes?
+我们使用我们自己的 Raft 实现来衡量 Raft 领导人选举的性能并且回答以下两个问题。首先，领导人选举的过程收敛是否快速？第二，在领导人宕机之后，最小的系统宕机时间是多久？
+
+<img src='ref/raft-figure-16.png' height='450px'/>
+
+> 图-16：发现并替换一个已经崩溃的领导人的时间。上面的图考察了在选举超时时间上的随机化程度，下面的图考察了最小超时时间。每条线代表了 1000 次实验（除了 150-150 毫秒只试了 100 次），和相应的确定的选举超时时间。例如，150-155 毫秒意思是，选举超时时间从这个区间范围内随机选择并确定下来。这个实验在一个拥有 5 个节点的集群上进行，其广播时延大约是 15 毫秒。对于 9 个节点的集群，结果也差不多。
+
+To measure leader election, we repeatedly crashed the leader of a cluster of five servers and timed how long it took to detect the crash and elect a new leader (see Figure 16). To generate a worst-case scenario, the servers in each trial had different log lengths, so some candidates were not eligible to become leader. Furthermore, to encourage split votes, our test script triggered a synchronized broadcast of heartbeat RPCs from the leader before terminating its process (this approximates the behavior of the leader replicating a new log entry prior to crashing). The leader was crashed uniformly randomly within its heartbeat interval, which was half of the minimum election timeout for all tests. Thus, the smallest possible downtime was about half of the minimum election timeout.
+为了衡量领导人选举，我们反复的使一个拥有五个节点的服务器集群的领导人宕机，并计算需要多久才能发现领导人已经宕机并选出一个新的领导人（见图-16）。为了构建一个最坏的场景，在每一的尝试里，服务器都有不同长度的日志，意味着有些候选人是没有成为领导人的资格的。另外，为了促成选票瓜分的情况，我们的测试脚本在终止领导人之前同步的发送了一次心跳广播（这大约和领导人在崩溃前复制一个新的日志给其他机器很像）。领导人均匀的随机的在心跳间隔里宕机，也就是最小选举超时时间的一半。因此，最小宕机时间大约就是最小选举超时时间的一半。
+
+The top graph in Figure 16 shows that **a small amount of randomization in the election timeout is enough to avoid split votes in elections**. In the absence of randomness, leader election consistently took longer than 10 seconds in our tests due to many split votes. Adding just 5ms of randomness helps significantly, resulting in a median downtime of 287ms. Using more randomness improves worst-case behavior: with 50ms of randomness the worstcase completion time (over 1000 trials) was 513ms. 
+图-16 上面的图表表明，只需要在选举超时时间上使用很少的随机化就可以大大避免选票被瓜分的情况。在没有随机化的情况下，在我们的测试里，选举过程由于太多的选票瓜分的情况往往都需要花费超过 10 秒钟。仅仅增加 5 毫秒的随机化时间，就大大的改善了选举过程，现在平均的宕机时间只有 287 毫秒。增加更多的随机化时间可以大大改善最坏情况：通过增加 50 毫秒的随机化时间，最坏的完成情况（1000 次尝试）只要 513 毫秒。
+
+The bottom graph in Figure 16 shows that downtime can be reduced by reducing the election timeout. With an election timeout of 12–24ms, it takes only 35ms on average to elect a leader (the longest trial took 152ms). However, lowering the timeouts beyond this point violates Raft’s timing requirement: leaders have difficulty broad- casting heartbeats before other servers start new elections. This can cause unnecessary leader changes and lower overall system availability. We recommend using a con- servative election timeout such as 150–300ms; such time- outs are unlikely to cause unnecessary leader changes and will still provide good availability. 
+图-16 中下面的图显示，通过减少选举超时时间可以减少系统的宕机时间。在选举超时时间为 12-24 毫秒的情况下，只需要平均 35 毫秒就可以选举出新的领导人（最长的一次花费了 152 毫秒）。然而，进一步降低选举超时时间的话就会违反 Raft 的时间不等式需求：在选举新领导人之前，领导人就很难发送完心跳包。这会导致没有意义的领导人改变并降低了系统整体的可用性。我们建议使用更为保守的选举超时时间，比如 150-300 毫秒；这样的时间不大可能导致没有意义的领导人改变，而且依然提供不错的可用性。
+
+# 10 Related work 相关工作
+
+There have been numerous publications related to consensus algorithms, many of which fall into one of the following categories: 
+已经有很多关于一致性算法的工作被发表出来，其中很多都可以归到下面的类别中
+
+- Lamport’s original description of Paxos [15], and attempts to explain it more clearly [16, 20, 21]. 
+Lamport 关于 Paxos 的原始描述，和尝试描述的更清晰的论文。
+
+- Elaborations of Paxos, which fill in missing details and modify the algorithm to provide a better foundation for implementation [26, 39, 13]. 
+关于 Paxos 的更详尽的描述，补充遗漏的细节并修改算法，使得可以提供更加容易的实现基础。
+
+- Systems that implement consensus algorithms, such as Chubby [2, 4], ZooKeeper [11, 12], and Spanner [6]. The algorithms for Chubby and Spanner have not been published in detail, though both claim to be based on Paxos. ZooKeeper’s algorithm has been published in more detail, but it is quite different from Paxos. 
+实现一致性算法的系统，例如 Chubby，ZooKeeper 和 Spanner。对于 Chubby 和 Spanner 的算法并没有公开发表其技术细节，尽管他们都声称是基于 Paxos 的。ZooKeeper 的算法细节已经发表，但是和 Paxos 有着很大的差别。
+- Performance optimizations that can be applied to Paxos [18, 19, 3, 25, 1, 27]. 
+Paxos 可以应用的性能优化。
+- Oki and Liskov’s Viewstamped Replication (VR), an alternative approach to consensus developed around the same time as Paxos. The original description [29] was intertwined with a protocol for distributed transactions, but the core consensus protocol has been separated in a recent update [22]. VR uses a leader- based approach with many similarities to Raft. 
+Oki 和 Liskov 的 Viewstamped Replication（VR），一种和 Paxos 差不多的替代算法。原始的算法描述和分布式传输协议耦合在了一起，但是核心的一致性算法在最近的更新里被分离了出来。VR 使用了一种基于领导人的方法，和 Raft 有很多相似之处。
+
+**The greatest difference between Raft and Paxos is Raft’s strong leadership**: Raft uses leader election as an essential part of the consensus protocol, and it concentrates as much functionality as possible in the leader. This approach results in a simpler algorithm that is easier to understand. For example, in Paxos, leader election is orthogonal垂直的 to the basic consensus protocol: it serves only as a performance optimization and is not required for achieving consensus. However, this results in additional mechanism: Paxos includes both a two-phase protocol for basic consensus and a separate mechanism for leader election. In contrast, Raft incorporates leader election directly into the consensus algorithm and uses it as the first of the two phases of consensus. This results in less mechanism than in Paxos. 
+Raft 和 Paxos 最大的不同之处就在于 Raft 的强领导特性：Raft 使用领导人选举作为一致性协议里必不可少的部分，并且将尽可能多的功能集中到了领导人身上。这样就可以使得算法更加容易理解。例如，在 Paxos 中，领导人选举和基本的一致性协议是垂直的：领导人选举仅仅是性能优化的手段，而且不是一致性所必须要求的。但是，这样就增加了多余的机制：Paxos 同时包含了针对基本一致性要求的两阶段提交协议和针对领导人选举的独立的机制。相比较而言，Raft 就直接将领导人选举纳入到一致性算法中，并作为两阶段一致性的第一步。这样就减少了很多机制。
+
+Like Raft, VR and ZooKeeper are leader-based and therefore share many of Raft’s advantages over Paxos. However, **Raft has less mechanism that VR or ZooKeeper because it minimizes the functionality in non-leaders**. For example, log entries in Raft flow in only one direction: outward from the leader in AppendEntries RPCs. In VR log entries flow in both directions (leaders can receive log entries during the election process); this results in additional mechanism and complexity. **The published description of ZooKeeper also transfers log entries both to and from the leader, but the implementation is apparently more like Raft [35].** 
+像 Raft 一样，VR 和 ZooKeeper 也是基于领导人的，因此他们也拥有一些 Raft 的优点。但是，Raft 比 VR 和 ZooKeeper 拥有更少的机制因为 Raft 尽可能的减少了非领导人的功能。例如，Raft 中日志条目都遵循着从领导人发送给其他人这一个方向：附加条目 RPC 是向外发送的。在 VR 中，日志条目的流动是双向的（领导人可以在选举过程中接收日志）；这就导致了额外的机制和复杂性。根据 ZooKeeper 公开的资料看，它的日志条目也是双向传输的，但是它的实现更像 Raft。
+
+Raft has fewer message types than any other algorithm for consensus-based log replication that we are aware of. For example, we counted the message types VR and ZooKeeper use for basic consensus and membership changes (excluding log compaction and client interaction, as these are nearly independent of the algorithms). VR and ZooKeeper each define 10 different message types, while Raft has only 4 message types (two RPC requests and their responses). **Raft’s messages are a bit more dense than the other algorithms’, but they are simpler collectively**. In addition, VR and ZooKeeper are described in terms of transmitting entire logs during leader changes; additional message types will be required to optimize these mechanisms so that they are practical. 
+和上述我们提及的其他基于一致性的日志复制算法中，Raft 的消息类型更少。例如，我们数了一下 VR 和 ZooKeeper 使用的用来基本一致性需要和成员改变的消息数（排除了日志压缩和客户端交互，因为这些都比较独立且和算法关系不大）。VR 和 ZooKeeper 都分别定义了 10 中不同的消息类型，相对的，Raft 只有 4 种消息类型（两种 RPC 请求和对应的响应）。Raft 的消息都稍微比其他算法的要信息量大，但是都很简单集中。另外，VR 和 ZooKeeper 都在领导人改变时传输了整个日志；所以为了能够实践中使用，额外的消息类型就很必要了。
+
+Raft’s strong leadership approach simplifies the algorithm, but it precludes some performance optimizations. For example, Egalitarian Paxos (EPaxos) can achieve higher performance under some conditions with a leaderless approach [27]. EPaxos exploits commutativity in state machine commands. Any server can commit a command with just one round of communication as long as other commands that are proposed concurrently commute with it. However, if commands that are proposed con- currently do not commute with each other, EPaxos requires an additional round of communication. Because any server may commit commands, EPaxos balances load well between servers and is able to achieve lower latency than Raft in WAN settings. However, it adds significant complexity to Paxos. 
+Raft 的强领导人模型简化了整个算法，但是同时也排斥了一些性能优化的方法。例如，平等主义 Paxos （EPaxos）在某些没有领导人的情况下可以达到很高的性能。平等主义 Paxos 充分发挥了在状态机指令中的交换性。任何服务器都可以在一轮通信下就提交指令，除非其他指令同时被提出了。然而，如果指令都是并发的被提出，并且互相之间不通信沟通，那么 EPaxos 就需要额外的一轮通信。因为任何服务器都可以提交指令，所以 EPaxos 在服务器之间的负载均衡做的很好，并且很容易在 WAN 网络环境下获得很低的延迟。但是，他在 Paxos 上增加了非常明显的复杂性。
+
+Several different approaches for cluster membership changes have been proposed or implemented in other work, including Lamport’s original proposal [15], VR [22], and SMART [24]. We chose the joint consensus approach for Raft because it leverages the rest of the consensus protocol, so that very little additional mechanism is required for membership changes. Lamport’s α-based approach was not an option for Raft because it assumes consensus can be reached without a leader. In comparison to VR and SMART, Raft’s reconfiguration algorithm has the advantage that membership changes can occur without limiting the processing of normal requests; in contrast, VR stops all normal processing during configuration changes, and SMART imposes an α-like limit on the number of outstanding requests. Raft’s approach also adds less mechanism than either VR or SMART. 
+一些集群成员变换的方法已经被提出或者在其他的工作中被实现，包括 Lamport 的原始的讨论，VR 和 SMART。我们选择使用共同一致（joint consensus）的方法因为它对一致性协议的其他部分影响很小，这样我们只需要很少的一些机制就可以实现成员变换。Raft 没有采用 Lamport 的基于 α 的方法是因为它假设在没有领导人的情况下也可以达到一致性。和 VR 和 SMART 相比较，Raft 的重新配置算法可以在不限制正常请求处理的情况下进行；相比较而言，VR 需要停止所有的处理过程，SMART 引入了一个和 α 类似的方法，限制了请求处理的数量。和 VR、SMART 比较而言，Raft 的方法同时需要更少的额外机制来实现。
+
+# 11 Conclusion 总结
+
+Algorithms are often designed with correctness, efficiency, and/or conciseness as the primary goals. Although these are all worthy goals, we believe that understandability is just as important. None of the other goals can be achieved until developers render the algorithm into a practical implementation, which will inevitably deviate from and expand upon the published form. Unless developers have a deep understanding of the algorithm and can create intuitions about it, it will be difficult for them to retain its desirable properties in their implementation. 
+算法的设计通常会把正确性，效率或者简洁作为主要的目标。尽管这些都是很有意义的目标，但是我们相信，可理解性也是一样的重要。在开发者把算法应用到实际的系统中之前，这些目标没有一个会被实现，这些都会必然的偏离发表时的形式。除非开发人员对这个算法有着很深的理解并且有着直观的感觉，否则将会对他们而言很难在实现的时候保持原有期望的特性。
+
+In this paper we addressed the issue of distributed consensus, where a widely accepted but impenetrable algorithm, Paxos, has challenged students and developers for many years. We developed a new algorithm, Raft, which we have shown to be more understandable than Paxos. We also believe that Raft provides a better foundation for system building. Using understandability as the primary design goal changed the way we approached the design of Raft; as the design progressed we found ourselves reusing a few techniques repeatedly, such as decomposing the problem and simplifying the state space. These techniques not only improved the understandability of Raft but also made it easier to convince ourselves of its correctness. 
+在这篇论文中，我们尝试解决分布式一致性问题，但是一个广为接受但是十分令人费解的算法 Paxos 已经困扰了无数学生和开发者很多年了。我们创造了一种新的算法 Raft，显而易见的比 Paxos 要容易理解。我们同时也相信，Raft 也可以为实际的实现提供坚实的基础。把可理解性作为设计的目标改变了我们设计 Raft 的方式；这个过程是我们发现我们最终很少有技术上的重复，例如问题分解和简化状态空间。这些技术不仅提升了 Raft 的可理解性，同时也使我们坚信其正确性。
+
+# 12 Acknowledgments
+
+...
+
+# References
+
+[1]  BOLOSKY, W. J., BRADSHAW, D., HAAGENS, R. B., KUSTERS, N. P., AND LI, P. Paxos replicated state machines as the basis of a high-performance data store. In *Proc. NSDI’11, USENIX Conference on Networked Systems Design and Implementation* (2011), USENIX, pp. 141–154.  
+[2]  BURROWS, M. The Chubby lock service for loosely- coupled distributed systems. In *Proc. OSDI’06, Sympo- sium on Operating Systems Design and Implementation* (2006), USENIX, pp. 335–350. 
+[3]  CAMARGOS, L. J., SCHMIDT, R. M., AND PEDONE, F. Multicoordinated Paxos. In *Proc. PODC’07, ACM Sym- posium on Principles of Distributed Computing* (2007), ACM, pp. 316–317. 
+[4]  CHANDRA, T. D., GRIESEMER, R., AND REDSTONE, J. Paxos made live: an engineering perspective. In *Proc. PODC’07, ACM Symposium on Principles of Distributed Computing* (2007), ACM, pp. 398–407. 
+[5]  CHANG, F., DEAN, J., GHEMAWAT, S., HSIEH, W. C., WALLACH, D. A., BURROWS, M., CHANDRA, T., FIKES, A., AND GRUBER, R. E. Bigtable: a distributed storage system for structured data. In *Proc. OSDI’06, USENIX Symposium on Operating Systems Design and Implementation* (2006), USENIX, pp. 205–218. 
+[6]  CORBETT, J. C., DEAN, J., EPSTEIN, M., FIKES, A., FROST, C., FURMAN, J. J., GHEMAWAT, S., GUBAREV, A., HEISER, C., HOCHSCHILD, P., HSIEH, W., KAN- THAK, S., KOGAN, E., LI, H., LLOYD, A., MELNIK, S., MWAURA, D., NAGLE, D., QUINLAN, S., RAO, R., ROLIG, L., SAITO, Y., SZYMANIAK, M., TAYLOR, C., WANG, R., AND WOODFORD, D. Spanner: Google’s globally-distributed database. In *Proc. OSDI’12, USENIX Conference on Operating Systems Design and Implemen- tation* (2012), USENIX, pp. 251–264.  						 					 				 			 		
+[7]  COUSINEAU, D., DOLIGEZ, D., LAMPORT, L., MERZ, S., RICKETTS, D., AND VANZETTO, H. TLA+ proofs. In *Proc. FM’12, Symposium on Formal Methods* (2012), D. Giannakopoulou and D. Me ́ry, Eds., vol. 7436 of *Lec- ture Notes in Computer Science*, Springer, pp. 147–154. 
+[8]  GHEMAWAT, S., GOBIOFF, H., AND LEUNG, S.-T. The Google file system. In *Proc. SOSP’03, ACM Symposium on Operating Systems Principles* (2003), ACM, pp. 29–43. 
+[9]  GRAY,C.,ANDCHERITON,D.Leases:Anefficientfault- tolerant mechanism for distributed file cache consistency. In *Proceedings of the 12th ACM Ssymposium on Operating Systems Principles* (1989), pp. 202–210.  						 						 	
+[10]  HERLIHY, M. P., AND WING, J. M. Linearizability: a correctness condition for concurrent objects. *ACM Trans- actions on Programming Languages and Systems 12* (July 1990), 463–492.
+[11]  HUNT, P., KONAR, M., JUNQUEIRA, F. P., AND REED, B . ZooKeeper: wait-free coordination for internet-scale systems. In *Proc ATC’10, USENIX Annual Technical Con- ference* (2010), USENIX, pp. 145–158.  						 						 						
+[12]  JUNQUEIRA, F. P., REED, B. C., AND SERAFINI, M. Zab: High-performance broadcast for primary-backup sys- tems. In *Proc. DSN’11, IEEE/IFIP Int’l Conf. on Depend- able Systems & Networks* (2011), IEEE Computer Society, pp. 245–256.  						 	
+[13]  KIRSCH, J., AND AMIR, Y. Paxos for system builders. Tech. Rep. CNDS-2008-2, Johns Hopkins University, 2008.  					
+[14]  L A M P O RT, L . Time, clocks, and the ordering of events in a distributed system. *Commununications of the ACM 21*, 7 (July 1978), 558–565. 
+[15]  L A M P O RT, L . The part-time parliament. *ACM Transac- tions on Computer Systems 16*, 2 (May 1998), 133–169.  			
+[16]  LAMPORT, L. Paxos made simple. *ACM SIGACT News 32*, 4 (Dec. 2001), 18–25.  						 						 				
+[17]  L A M P O RT, L . *Specifying Systems, The TLA+ Language and Tools for Hardware and Software Engineers*. Addison- Wesley, 2002.
+[18]  LAMPORT, L. Generalized consensus and Paxos. Tech. Rep. MSR-TR-2005-33, Microsoft Research, 2005.  						 	
+[19] L A M P O RT, L . Fast paxos. *Distributed Computing 19* (2006), 79–103., 2  				 			 			 				 					 
+[20]  LAMPSON, B. W. How to build a highly available system using consensus. In *Distributed Algorithms*, O. Baboaglu and K. Marzullo, Eds. Springer-Verlag, 1996, pp. 1–17.
+[21]  LAMPSON, B. W. The ABCD’s of Paxos. In *Proc. PODC’01, ACM Symposium on Principles of Distributed Computing* (2001), ACM, pp. 13–13.
+[22]  LISKOV, B., AND COWLING, J. Viewstamped replica- tion revisited. Tech. Rep. MIT-CSAIL-TR-2012-021, MIT, July 2012.  		
+[23]  LogCabin source code. http://github.com/ logcabin/logcabin. 
+[24] LORCH, J. R., ADYA, A., BOLOSKY, W. J., CHAIKEN, R., DOUCEUR, J. R., AND HOWELL, J. The SMART way to migrate replicated stateful services. In Proc. Eu- roSys’06, ACM SIGOPS/EuroSys European Conference on Computer Systems (2006), ACM, pp. 103–115.
+[25] MAO, Y., JUNQUEIRA, F. P., AND MARZULLO, K. Mencius: building efficient replicated state machines for
+WANs. In Proc. OSDI’08, USENIX Conference on Operating Systems Design and Implementation (2008), USENIX, pp. 369–384.
+[26] MAZIE RES, D. Paxos made practical.http://www.scs.stanford.edu/ ̃dm/home/ papers/paxos.pdf , Jan. 2007.
+[27]  MORARU, I., ANDERSEN, D. G., AND KAMINSKY, M. There is more consensus in egalitarian parliaments. In *Proc. SOSP’13, ACM Symposium on Operating System Principles* (2013), ACM.
+[28]  Raft user study. http://ramcloud.stanford. edu/ ̃ongaro/userstudy/. 
+[29]  OKI, B. M., AND LISKOV, B. H. Viewstamped replication: A new primary copy method to support highly-available distributed systems. In *Proc. PODC’88, ACM Symposium on Principles of Distributed Computing* (1988), ACM, pp. 8–17.  			
+[30]  O’NEIL, P., CHENG, E., GAWLICK, D., AND ONEIL, E. The log-structured merge-tree (LSM-tree). *Acta Informat- ica 33*, 4 (1996), 351–385.
+[31]  ONGARO, D. *Consensus: Bridging Theory and Practice*. PhD thesis, Stanford University, 2014 (work in progress). http://ramcloud.stanford.edu/ ̃ongaro/ thesis.pdf.
+[32] ONGARO, D., AND OUSTERHOUT, J. In search of an understandable consensus algorithm. In Proc ATC’14, USENIX Annual Technical Conference (2014), USENIX.
+[33] OUSTERHOUT, J., AGRAWAL, P., ERICKSON, D., KOZYRAKIS, C., LEVERICH, J., MAZIERES, D., MI- TRA, S., NARAYANAN, A., ONGARO, D., PARULKAR, G., ROSENBLUM, M., RUMBLE, S. M., STRATMANN, E., AND STUTSMAN, R. The case for RAMCloud. Com- munications of the ACM 54 (July 2011), 121–130.
+[34] Raft consensus algorithm website. http://raftconsensus.github.io.
+[35] REED, B. Personal communications, May 17, 2013.
+[36] ROSENBLUM, M., AND OUSTERHOUT, J. K. The design and implementation of a log-structured file system. ACM Trans. Comput. Syst. 10 (February 1992), 26–52.
+[37] S C H N E I D E R , F. B . Implementing fault-tolerant services using the state machine approach: a tutorial. ACM Com- puting Surveys 22, 4 (Dec. 1990), 299–319.
+[38] SHVACHKO, K., KUANG, H., RADIA, S., AND CHANSLER, R. The Hadoop distributed file system. In Proc. MSST’10, Symposium on Mass Storage Sys- tems and Technologies (2010), IEEE Computer Society, pp. 1–10.
+[39] VAN RENESSE, R. Paxos made moderately complex. Tech. rep., Cornell University, 2012.
