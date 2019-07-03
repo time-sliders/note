@@ -32,10 +32,7 @@
 - Linux 后缀为 `.tar.xz` 格式的文件-解压，解压出来是tar，再对tar进行解压
 - 命令：`tar xf XXXXXX.tar.xz`
 
-
-
 -----------------------------------------------------------
-
 
 ## 常用文件进行--压缩--命令整理
 
@@ -61,7 +58,6 @@
 - Linux 压缩文件为后缀 `.7z` 格式的文件
 - 命令：`7za a test1.7z /opt/test1/`
 
-
 ## 分卷压缩
 
 - 分卷压缩：`zip -s 100M myFile.zip --out newFile.zip`
@@ -74,7 +70,6 @@ newFile.z03
 newFile.z04
 newFile.zip
 ```
-
 
 ## 特殊格式
 
@@ -107,8 +102,6 @@ newFile.zip
 - 一般 class 文件都是在多层目录里面的，需要这样做：`jar uvf mytest.jar com/youmeek/ClassToAdd.class`
 	- 需要在 jar 所在的文件夹下创建：`mkdir -p ./com/youmeek`，该目录必须和原 jar 里面的层级目录结构一致
 
-
 ## 资料
 
 - <http://forum.ubuntu.org.cn/viewtopic.php?f=50&t=158893>
-
