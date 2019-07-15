@@ -2,7 +2,7 @@
 
 The Paxos algorithm for implementing a fault-tolerant distributed system has been regarded as difficult to understand, perhaps because the original presentation was Greek to many readers [5]. In fact, it is among the simplest and most obvious of distributed algorithms. At its heart is a consensus algorithm—the “synod” algorithm of [5]. The next section shows that this consensus algorithm follows almost unavoidably from the properties we want it to satisfy. The last section explains the complete Paxos algorithm, which is obtained by the straightforward application of consensus to the state ma- chine approach for building a distributed system—an approach that should be well-known, since it is the subject of what is probably the most often-cited article on the theory of distributed systems [4]. 
 
-# 2 The Consensus Algorithm 
+# 2 The Consensus Algorithm
 
 ## 2.1 The Problem 
 
@@ -180,7 +180,7 @@ Leader可以在它提出的命令141被选定前提出命令142。它发送的�
 
 A newly chosen leader executes phase 1 for infinitely many instances of the consensus algorithm—in the scenario above, for instances 135–137 and all instances greater than 139. Using the same proposal number for all instances, it can do this by sending a single reasonably short message to the other servers. In phase 1, an acceptor responds with more than a simple OK only if it has already received a phase 2 message from some proposer. (In the scenario, this was the case only for instances 135 and 140.) Thus, a server (acting as acceptor) can respond for all instances with a single reasonably short message. Executing these infinitely many instances of phase 1 therefore poses no problem. 
 一个新选定的Leader需要为无数个一致性算法实例执行Phase 1——在上面的场景中，就是135-137以及所有大于139的执行实例。通过向其他服务器发送一条合适的消息，就可以让所有执行实例使用同一个提案编号（计数器）。在Phase 1中，只要一个Acceptor已经收到来自某Proposer的Phase 2消息，那么它就可以为不止一个实例作出通过回应（在上面的场景中，就是针对135和140的情况）。因此一个服务器（作为Acceptor时）可以用一条适当的短消息对所有实例作出回应。执行这样无限多的实例的Phase 1也不会有问题。
- 
+
 Since failure of the leader and election of a new one should be rare events, the effective cost of executing a state machine command—that is, of achieving consensus on the command/value—is the cost of executing only phase 2 of the consensus algorithm. It can be shown that phase 2 of the Paxos consensus algorithm has the minimum possible cost of any algorithm for reaching agreement in the presence of faults [2]. Hence, the Paxos algorithm is essentially optimal. 
 * 这里应该是指稳定的Paxos模型，Phase 1可以被省略，只要编号计数器是唯一的。
 

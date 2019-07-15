@@ -14,7 +14,7 @@
 
 ### 整数类型的存储需求
 
-![MysqlNumberTypeMemoryUsage.png](ref/MysqlNumberTypeMemoryUsage.png)
+<img src='ref/MysqlNumberTypeMemoryUsage.png' height='200px'>
 
 > 显示宽度与取值范围
 >
@@ -156,7 +156,9 @@ MySQL 分别为整数和小数部分分配存储空间。 MySQL 使用二进制�
 
 > Values for DECIMAL (and NUMERIC) columns are represented using a binary format that **packs nine decimal (base 10) digits into four bytes**. Storage for the integer and fractional parts of each value are determined separately. Each multiple of nine digits requires four bytes, and the “leftover” digits require some fraction of four bytes. The storage required for excess digits is given by the following table.
 
-<img src="ref/MysqlDecimalMemoryUsage.png" width = "500" height = "190" div align=left/>
+<img src="ref/MysqlDecimalMemoryUsage.png" height = "190" div align=left/>
+
+
 
 例如，DECIMAL(19,9) 对于小数部分具有9位数字，对于整数部分具有19-9位 = 10位数字，小数部分需要4个字节。 整数部分对于前9位数字需要4个字节，1个剩余字节需要1个字节。DECIMAL(19,9)列总共需要9个字节
 
@@ -196,11 +198,11 @@ column_name DECIMAL;
 
 下图是日期类型的内存使用情况
 
-![MysqlDateMemoryUsage.png](ref/MysqlDateMemoryUsage.png)
+<img src="ref/MysqlDateMemoryUsage.png" height = "120" div align=left/>
 
 > As of MySQL 5.6.4, storage for YEAR and DATE remains unchanged. However, TIME, DATETIME, and TIMESTAMP are represented differently. DATETIME is packed more efficiently, requiring 5 rather than 8 bytes for the nonfractional part, and all three parts have a fractional part that requires from 0 to 3 bytes, depending on the fractional seconds precision of stored values.
 >
-> <img src="ref/DateTimeFractionalMemoryUsage.png" width = "400" height = "120" div align=left/>
+> <img src="ref/DateTimeFractionalMemoryUsage.png" height = "100" div align=left/>
 >
 > For example, TIME(0), TIME(2), TIME(4), and TIME(6) use 3, 4, 5, and 6 bytes, respectively. TIME and TIME(0) are equivalent and require the same storage.
 

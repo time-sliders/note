@@ -64,6 +64,7 @@ protected final boolean tryAcquire(int acquires) {
     int w = exclusiveCount(c);
     if (c != 0) {
         // (Note: if c != 0 and w == 0 then shared count != 0)
+      	// 如果有读锁（c!=0 && w=0 说明有读锁存在） 或者 (w!=0 && thread!=current)已经有另外一个线程持有写锁了则直接失败
         if (w == 0 || current != getExclusiveOwnerThread())
             return false;
         if (w + exclusiveCount(acquires) > MAX_COUNT)

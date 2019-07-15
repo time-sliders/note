@@ -181,7 +181,7 @@ protected boolean tryAcquire(int arg) {
 
 ### release
 
-在独占模式下，释放所占用的资源。根据实现来释放一个或多个资源。该方法一般用来实现 unlock 语义。
+在独占模式下，释放锁占用的资源。根据实现来释放一个或多个资源。该方法一般用来实现 unlock 语义。
 
 ```java
 /**
