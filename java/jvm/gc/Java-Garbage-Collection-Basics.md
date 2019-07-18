@@ -70,7 +70,7 @@ As stated earlier, having to mark and compact all the objects in a JVM is ineffi
 
 > Here is an example of such data. The Y axis`轴` shows the number of bytes allocated and the X access shows the number of bytes allocated over time.
 >
-> ![Byte allocated](ref/bytes-allocated.gif)
+> <img src='ref/bytes-allocated.gif' height='250'>
 
 As you can see, fewer and fewer objects remain allocated over time`随着时间流逝`. In fact most objects have a very short life as shown by the higher values on the left side of the graph.
 
@@ -78,7 +78,9 @@ As you can see, fewer and fewer objects remain allocated over time`随着时间�
 
 The information learned from the object allocation behavior can be used to enhance the performance of the JVM. Therefore, the heap is broken up into smaller parts or generations. The heap parts are: Young Generation, Old or Tenured Generation, and Permanent Generation
 
-![hotspot-heap-structure.png](ref/hotspot-heap-structure.png)
+
+
+<img src='ref/hotspot-heap-structure.png' height=300 />
 
 The **Young Generation** is where all new objects are allocated and aged. When the young generation fills up, this causes a **minor garbage collection**. Minor collections can be optimized assuming`假设` a high object mortality rate`死亡率`. A young generation full of dead objects is collected very quickly. Some surviving objects are aged`老化` and eventually move to the old generation.
 
@@ -100,9 +102,11 @@ Now that you understand why the heap is separted into different generations, it 
 
 1. First, any new objects are allocated to the eden space. Both survivor spaces start out`起初是` empty.
 
-   ![object-allocation.png](ref/object-allocation.png)
+   <img src='ref/object-allocation.png' height=300 />
 
 2. When the eden space fills up, a minor garbage collection is triggered.
+
+   
 
    ![filling-the-eden-space.png](ref/filling-the-eden-space.png)
 
