@@ -70,6 +70,10 @@ protected HandlerExecutionChain getHandler(HttpServletRequest request) throws Ex
 
 3. org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerMapping
 
+![HandlerMapping.png](ref/HandlerMapping.png)
+
+
+
 我们继续进入这个 AbstractUrlHandlerMapping 的 getHandler 方法中去看下
 在 BeanNameUrlHandlerMapping  和 SimpleUrlHandlerMapping 是直接调用父类 AbstractUrlHandlerMapping的方法
 
@@ -295,6 +299,8 @@ protected void detectHandlerMethods(Object handler) {
 但是还有一个问题时：RequestMappingHandlerMapping 是怎么注入到 DispatcherServlet 中的
 
 DispatcherServlet 继承 HttpServletBean, 改了继承  HttpServlet ，且重写了 init 方法，所以在容器初始化阶段，会调用其 init 方法。在init方法内部最终会调用 initWebApplicationContext，最后会调用 DispatcherServlet 的 onRefresh 方法
+
+> **// TODO 此时 SpringApplicationContext  已经加载???**)
 
 ```java
 /**
