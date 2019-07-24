@@ -10,7 +10,9 @@
 
 The key components of the JVM that relate to performance are highlighted in the following image.
 
-![key-hotspot-jvm-components](ref/key-hotspot-jvm-components.png)There are three components of the JVM that are focused on when tuning performance. The *heap* is where your object data is stored. This area is then managed by the garbage collector selected at startup. Most tuning options relate to sizing the heap and choosing the most appropriate garbage collector for your situation. The JIT compiler also has a big impact on performance but rarely requires tuning with the newer versions of the JVM.
+<img src='ref/key-hotspot-jvm-components.png' height='350px'>
+
+There are three components of the JVM that are focused on when tuning performance. The *heap* is where your object data is stored. This area is then managed by the garbage collector selected at startup. Most tuning options relate to sizing the heap and choosing the most appropriate garbage collector for your situation. The JIT compiler also has a big impact on performance but rarely requires tuning with the newer versions of the JVM.
 
 ### Performance Basics
 
@@ -46,7 +48,7 @@ In a programming language like C, allocating and deallocating memory is a manual
 
 The first step in the process is called marking. This is where the garbage collector identifies which pieces of memory are in use and which are not
 
-![marking](ref/marking.png)
+<img src='ref/marking.png' height='350px'>
 
 Referenced objects are shown in blue. Unreferenced objects are shown in gold. All objects are scanned in the marking phase to make this determination. This can be a very time consuming process`非常耗时的过程` if all objects in a system must be scanned.
 
@@ -54,7 +56,9 @@ Referenced objects are shown in blue. Unreferenced objects are shown in gold. Al
 
 Normal deletion removes unreferenced objects leaving referenced objects and pointers to free space.
 
-![Normal Deletion](ref/normal-deletion.png)
+
+
+<img src='ref/normal-deletion.png' height='250px'>
 
 The **memory allocator** holds references to blocks of free space where new object can be allocated.
 
@@ -62,7 +66,9 @@ The **memory allocator** holds references to blocks of free space where new obje
 
 **To further improve performance, in addition to deleting unreferenced objects, you can also compact the remaining referenced objects. By moving referenced object together, this makes new memory allocation much easier and faster.**
 
-![Deletion with Compacting](ref/deletion-with-compacting.png)
+
+
+<img src='ref/deletion-with-compacting.png' height='250px'>
 
 #### Why Generational Garbage Collection?
 

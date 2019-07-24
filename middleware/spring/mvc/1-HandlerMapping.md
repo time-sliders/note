@@ -300,8 +300,6 @@ protected void detectHandlerMethods(Object handler) {
 
 DispatcherServlet 继承 HttpServletBean, 改了继承  HttpServlet ，且重写了 init 方法，所以在容器初始化阶段，会调用其 init 方法。在init方法内部最终会调用 initWebApplicationContext，最后会调用 DispatcherServlet 的 onRefresh 方法
 
-> **// TODO 此时 SpringApplicationContext  已经加载???**)
-
 ```java
 /**
  * This implementation calls {@link #initStrategies}.

@@ -77,15 +77,6 @@ private static class PlatformClassLoader extends BuiltinClassLoader {
         super("platform", parent, null);
     }
 
-    /**
-     * Called by the VM to support define package for AppCDS.
-     *
-     * Shared classes are returned in ClassLoader::findLoadedClass
-     * that bypass the defineClass call.
-     */
-    private Package definePackage(String pn, Module module) {
-        return JLA.definePackage(this, pn, module);
-    }
 }
 ```
 
@@ -107,54 +98,5 @@ private static class AppClassLoader extends BuiltinClassLoader {
         this.ucp = ucp;
     }
 
-    @Override
-    protected Class<?> loadClass(String cn, boolean resolve)
-        throws ClassNotFoundException
-    {
-        // for compatibility reasons, say where restricted package list has
-        // been updated to list API packages in the unnamed module.
-        SecurityManager sm = System.getSecurityManager();
-        if (sm != null) {
-            int i = cn.lastIndexOf('.');
-            if (i != -1) {
-                sm.checkPackageAccess(cn.substring(0, i));
-            }
-        }
-
-        return super.loadClass(cn, resolve);
-    }
-
-    @Override
-    protected PermissionCollection getPermissions(CodeSource cs) {
-        PermissionCollection perms = super.getPermissions(cs);
-        perms.add(new RuntimePermission("exitVM"));
-        return perms;
-    }
-
-    /**
-     * Called by the VM to support dynamic additions to the class path
-     *
-     * @see java.lang.instrument.Instrumentation#appendToSystemClassLoaderSearch
-     */
-    void appendToClassPathForInstrumentation(String path) {
-        addClassPathToUCP(path, ucp);
-    }
-
-    /**
-     * Called by the VM to support define package for AppCDS
-     *
-     * Shared classes are returned in ClassLoader::findLoadedClass
-     * that bypass the defineClass call.
-     */
-    private Package definePackage(String pn, Module module) {
-        return JLA.definePackage(this, pn, module);
-    }
-
-    /**
-     * Called by the VM to support define package for AppCDS
-     */
-    protected Package defineOrCheckPackage(String pn, Manifest man, URL url) {
-        return super.defineOrCheckPackage(pn, man, url);
-    }
 }
 ```
