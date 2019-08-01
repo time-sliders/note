@@ -8,7 +8,7 @@ A container for data of a specific primitive type.
 A buffer is a linear, finite sequence of elements of a specific primitive type. Aside from its content, the essential properties of a buffer are its capacity, limit, and position:
 一个 buffer 是一个线性的、有限的特定基本数据类型元素的序列。除了它的内容，buffer 的基本属性包含它的 capacity、limit、position
 
-* A buffer's `capacity` is the number of elements it contains. The capacity of a buffer is never negative and never changes.
+* A buffer's `capacity` is the number of elements it contains. The capacity of a buffer is never negative and **never changes**.
 buffer 的 capacity 是它包含的元素的数量，一个 buffer 的 capacity 是一个不会变化的正整数。
 
 * A buffer's `limit` is the index of the first element that should not be read or written. A buffer's limit is never negative and is never greater than its capacity.
@@ -70,7 +70,7 @@ Every buffer is readable, but not every buffer is writable. The mutation methods
 
 **Thread safety**
 
-Buffers are not safe for use by multiple concurrent threads. If a buffer is to be used by more than one thread then access to the buffer should be controlled by appropriate synchronization.
+Buffers are **not safe** for use by multiple concurrent threads. If a buffer is to be used by more than one thread then access to the buffer should be controlled by appropriate synchronization.
 buffer 在多线程使用时是不安全的。如果需要在多线程间访问，需要适当的同步机制。
 
 **Invocation chaining**
@@ -86,6 +86,7 @@ Methods in this class that do not otherwise have a value to return are specified
 
 can be replaced by the single, more compact statement
 可以替换为单个，更紧凑的语句
+
 ```
    b.flip().position(23).limit(42);
 ```
