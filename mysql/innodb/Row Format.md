@@ -63,15 +63,15 @@ The `COMPACT` row format has the following storage characteristics:
 
 - The variable-length part of the record header **contains a bit vector for indicating `NULL` columns**. If the number of columns in the index that can be `NULL` is *N*, the bit vector occupies `CEILING(*N*/8)` bytes. (For example, if there are anywhere from 9 to 16 columns that can be `NULL`, the bit vector uses two bytes.) **Columns that are `NULL` do not occupy space other than the bit in this vector.**“空”列不占用此向量中位以外的空间。  **The variable-length part of the header also contains the lengths of variable-length columns**. <u>Each length takes one or two bytes, depending on the maximum length of the column</u>. If all columns in the index are `NOT NULL` and have a fixed length, the record header has no variable-length part.
 
-- For each non-`NULL` variable-length field, the record header contains the length of the column in one or two bytes. Two bytes are only needed if part of the column is stored externally in overflow pages or the maximum length exceeds 255 bytes and the actual length exceeds 127 bytes. For an externally stored column, the 2-byte length indicates the length of the internally stored part plus the 20-byte pointer to the externally stored part. The internal part is 768 bytes, so the length is 768+20. The 20-byte pointer stores the true length of the column.
+- **For each non-`NULL` variable-length field, the record header contains the length of the column in one or two bytes. Two bytes are only needed if part of the column is stored externally in overflow pages or the maximum length exceeds 255 bytes and the actual length exceeds 127 bytes. For an externally stored column, the 2-byte length indicates the length of the internally stored part plus the 20-byte pointer to the externally stored part. The internal part is 768 bytes, so the length is 768+20. The 20-byte pointer stores the true length of the column.**
 
 - **The record header is followed by the data contents of non-`NULL` columns.**
 
-- Records in the clustered index contain fields for all user-defined columns. In addition, there is a 6-byte transaction ID field and a 7-byte roll pointer field.
+- Records in the clustered index contain fields for all user-defined columns. In addition, there is a **6-byte transaction ID** field and a **7-byte roll pointer field.**
 
 - If no primary key is defined for a table, each clustered index record also contains a **6-byte row ID field**.
 
-- Each secondary index record contains all the primary key columns defined for the clustered index key that are not in the secondary index. If any of the primary key columns are variable length, the record header for each secondary index has a variable-length part to record their lengths, even if the secondary index is defined on fixed-length columns.
+- **Each secondary index record contains all the primary key columns defined for the clustered index key that are not in the secondary index**. If any of the primary key columns are variable length, the record header for each secondary index has a variable-length part to record their lengths, even if the secondary index is defined on fixed-length columns.
 
 - Internally, for nonvariable-length character sets, fixed-length character columns such as [`CHAR(10)`](https://dev.mysql.com/doc/refman/8.0/en/char.html) are stored in a fixed-length format.
 
@@ -85,21 +85,23 @@ The `COMPACT` row format has the following storage characteristics:
 
 ### DYNAMIC Row Format
 
-The `DYNAMIC` row format offers the same storage characteristics as the `COMPACT` row format but adds enhanced storage capabilities for long variable-length columns and supports large index key prefixes.
+The `DYNAMIC` row format offers the same storage characteristics as the `COMPACT` row format but adds **enhanced storage capabilities for long variable-length columns and supports large index key prefixes.**
 
-When a table is created with `ROW_FORMAT=DYNAMIC`, `InnoDB` can store long variable-length column values (for [`VARCHAR`](https://dev.mysql.com/doc/refman/8.0/en/char.html), [`VARBINARY`](https://dev.mysql.com/doc/refman/8.0/en/binary-varbinary.html), and [`BLOB`](https://dev.mysql.com/doc/refman/8.0/en/blob.html)and [`TEXT`](https://dev.mysql.com/doc/refman/8.0/en/blob.html) types) fully off-page, with the clustered index record containing only a 20-byte pointer to the overflow page. Fixed-length fields greater than or equal to 768 bytes are encoded as variable-length fields. For example, a `CHAR(255)` column can exceed 768 bytes if the maximum byte length of the character set is greater than 3, as it is with `utf8mb4`.
+When a table is created with `ROW_FORMAT=DYNAMIC`, `InnoDB` can **store long variable-length column values** (for [`VARCHAR`](https://dev.mysql.com/doc/refman/8.0/en/char.html), [`VARBINARY`](https://dev.mysql.com/doc/refman/8.0/en/binary-varbinary.html), and [`BLOB`](https://dev.mysql.com/doc/refman/8.0/en/blob.html)and [`TEXT`](https://dev.mysql.com/doc/refman/8.0/en/blob.html) types) **fully off-page**, **with the clustered index record containing only a 20-byte pointer to the overflow page**. **Fixed-length fields greater than or equal to 768 bytes are encoded as variable-length fields**. For example, a `CHAR(255)` column can exceed 768 bytes if the maximum byte length of the character set is greater than 3, as it is with `utf8mb4`.
 
-Whether columns are stored off-page depends on the page size and the total size of the row. When a row is too long, the longest columns are chosen for off-page storage until the clustered index record fits on the [B-tree](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_b_tree) page. [`TEXT`](https://dev.mysql.com/doc/refman/8.0/en/blob.html) and [`BLOB`](https://dev.mysql.com/doc/refman/8.0/en/blob.html) columns that are less than or equal to 40 bytes are stored in line.
+**Whether columns are stored off-page depends on the page size and the total size of the row. When a row is too long, the longest columns are chosen for off-page storage until the clustered index record fits on the [B-tree](https://dev.mysql.com/doc/refman/8.0/en/glossary.html#glos_b_tree) page. [`TEXT`](https://dev.mysql.com/doc/refman/8.0/en/blob.html) and [`BLOB`](https://dev.mysql.com/doc/refman/8.0/en/blob.html) columns that are less than or equal to 40 bytes are stored in line.**
 
-The `DYNAMIC` row format maintains the efficiency of storing the entire row in the index node if it fits (as do the `COMPACT` and `REDUNDANT`formats), but the `DYNAMIC` row format avoids the problem of filling B-tree nodes with a large number of data bytes of long columns. The `DYNAMIC` row format is based on the idea that if a portion of a long data value is stored off-page, it is usually most efficient to store the entire value off-page. With `DYNAMIC` format, shorter columns are likely to remain in the B-tree node, minimizing the number of overflow pages required for a given row.
+**The `DYNAMIC` row format maintains the efficiency of storing the entire row in the index node if it fits (as do the `COMPACT` and `REDUNDANT`formats), but the `DYNAMIC` row format avoids the problem of filling B-tree nodes with a large number of data bytes of long columns. The `DYNAMIC` row format is based on the idea that if a portion部分 of a long data value is stored off-page, it is usually most efficient to store the entire value off-page通常最有效的方法是将整个值存储在页外. With `DYNAMIC` format, shorter columns are likely to remain in the B-tree node, minimizing the number of overflow pages required for a given row.对于一个指定行最小化它需要的溢出页数量**
 
-The `DYNAMIC` row format supports index key prefixes up to 3072 bytes.
+The `DYNAMIC` row format **supports index key prefixes up to 3072 bytes**.
 
 Tables that use the `DYNAMIC` row format can be stored in the system tablespace, file-per-table tablespaces, and general tablespaces. To store `DYNAMIC` tables in the system tablespace, either disable [`innodb_file_per_table`](https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_file_per_table) and use a regular `CREATE TABLE` or `ALTER TABLE`statement, or use the `TABLESPACE [=] innodb_system` table option with `CREATE TABLE` or `ALTER TABLE`. The [`innodb_file_per_table`](https://dev.mysql.com/doc/refman/8.0/en/innodb-parameters.html#sysvar_innodb_file_per_table)variable is not applicable to general tablespaces, nor is it applicable when using the `TABLESPACE [=] innodb_system` table option to store `DYNAMIC` tables in the system tablespace.
 
 #### DYNAMIC Row Format Storage Characteristics
 
 The `DYNAMIC` row format is a variation of the `COMPACT` row format. For storage characteristics, see [COMPACT Row Format Storage Characteristics](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-compact-row-format-characteristics).
+
+<img src='ref/DYNAMIC-RowFormat.png' height=500px />
 
 ### COMPRESSED Row Format
 
