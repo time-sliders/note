@@ -1,10 +1,10 @@
-原文地址： https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html
+原文地址： 
 
 ## 15.10 InnoDB Row Formats
 
-The row format of a table determines how its rows are physically stored, which in turn can affect the performance of queries and DML operations. As more rows fit into a single disk page, queries and index lookups can work faster, less cache memory is required in the buffer pool, and less I/O is required to write out updated values.
+The row format of a table determines how its rows are physically stored, which in turn can affect the performance of queries and DML operations. **As more rows fit into a single disk page, queries and index lookups can work faster**, less cache memory is required in the buffer pool, and less I/O is required to write out updated values.
 
-The data in each table is divided into pages. The pages that make up each table are arranged in a tree data structure called a B-tree index. Table data and secondary indexes both use this type of structure. The B-tree index that represents an entire table is known as the clustered index, which is organized according to the primary key columns. The nodes of a clustered index data structure contain the values of all columns in the row. The nodes of a secondary index structure contain the values of index columns and primary key columns.
+The data in each table is divided into pages. The pages that make up each table are arranged in a tree data structure called a B-tree index. Table data and secondary indexes both use this type of structure. The B-tree index that represents an entire table is known as the **clustered index**, which is <u>organized according to the primary key columns</u>. The nodes of a clustered index data structure contain the values of all columns in the row. The nodes of a **secondary index structure contain the values of index columns and primary key columns**.
 
 <u>Variable-length columns are an exception to the rule that column values are stored in B-tree index nodes. Variable-length columns that are too long to fit on a B-tree page are stored on separately allocated disk pages called **overflow pages**. Such columns are referred to as off-page columns. The values of off-page columns are stored in singly-linked lists of overflow pages, with each such column having its own list of one or more overflow pages. Depending on column length, all or a prefix of variable-length column values are stored in the B-tree to avoid wasting storage and having to read a separate page.</u>
 
@@ -20,13 +20,6 @@ The `InnoDB` storage engine supports four row formats: `REDUNDANT`冗余, `COMPA
 | `COMPRESSED` | Yes                             | Yes                                     | Yes                            | Yes                 | file-per-table, general         |
 
 The topics that follow describe row format storage characteristics and how to define and determine the row format of a table.
-
-- [REDUNDANT Row Format](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-row-format-redundant)
-- [COMPACT Row Format](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-row-format-compact)
-- [DYNAMIC Row Format](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-row-format-dynamic)
-- [COMPRESSED Row Format](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-row-format-compressed)
-- [Defining the Row Format of a Table](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-row-format-defining)
-- [Determining the Row Format of a Table](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-row-format-detrmining)
 
 ### REDUNDANT Row Format
 
@@ -99,7 +92,7 @@ Tables that use the `DYNAMIC` row format can be stored in the system tablespace,
 
 #### DYNAMIC Row Format Storage Characteristics
 
-The `DYNAMIC` row format is a variation of the `COMPACT` row format. For storage characteristics, see [COMPACT Row Format Storage Characteristics](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-compact-row-format-characteristics).
+The `DYNAMIC` row format is a variation of the `COMPACT` row format. For storage characteristics, see [COMPACT Row Format Storage Characteristics](#innodb-compact-row-format-characteristics).
 
 <img src='ref/DYNAMIC-RowFormat.png' height=500px />
 
@@ -115,7 +108,7 @@ Tables that use the `COMPRESSED` row format can be created in file-per-table tab
 
 #### Compressed Row Format Storage Characteristics
 
-The `COMPRESSED` row format is a variation of the `COMPACT` row format. For storage characteristics, see [COMPACT Row Format Storage Characteristics](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html#innodb-compact-row-format-characteristics).
+The `COMPRESSED` row format is a variation of the `COMPACT` row format. For storage characteristics, see [COMPACT Row Format Storage Characteristics](#innodb-compact-row-format-characteristics).
 
 ### Defining the Row Format of a Table
 
