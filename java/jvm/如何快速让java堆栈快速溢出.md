@@ -12,4 +12,5 @@
 堆是随机存放的。
 
 StackOverFlow : 总是在无限递归调用时候可以看见。
-OutOfMemory   : 可以通过无限 new 实现。
+OutOfMemory  : 可以通过无限 new 实现。
+

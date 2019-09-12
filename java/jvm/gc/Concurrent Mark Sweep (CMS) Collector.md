@@ -14,7 +14,7 @@ As described previously, in normal operation, the CMS collector does most of its
 
 ## Excessive`过长的` GC Time and `OutOfMemoryError`
 
-The CMS collector throws an `OutOfMemoryError` if too much time is being spent in garbage collection: If more than 98% of the total time is spent in garbage collection and less than 2% of the heap is recovered, then an `OutOfMemoryError` is thrown.
+The CMS collector throws an `OutOfMemoryError` if too much time is being spent in garbage collection: **If more than 98% of the total time is spent in garbage collection and less than 2% of the heap is recovered**, then an `OutOfMemoryError` is thrown.
 
 This feature is designed to prevent applications from running for an extended period of time while making little or no progress because the heap is too small. If necessary, this feature can be disabled by adding the option `-XX:-UseGCOverheadLimit` to the command line.
 

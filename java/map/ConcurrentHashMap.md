@@ -1,5 +1,3 @@
-This file is organized to make things a little easier to follow while reading than they might otherwise: First the main static declarations and utilities, then fields, then main public methods (with a few factorings of multiple public methods into internal ones), then sizing methods, trees, traversers, and bulk operations.
-
 ## sourcecode
 
 ### 常量
