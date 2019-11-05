@@ -43,7 +43,7 @@ static {
 **`PlatformClassLoader`**:  平台类加载器，用于加载一些平台相关的模块，双亲是`BootClassLoader`
 **`AppClassLoader`**:  应用模块加载器，用于加载应用级别的模块，双亲是`PlatformClassLoader`
 
-![class-loader](ref/class-loader.png)
+<img src="ref/class-loader.png" height='300'/>
 
 ```java
 /**

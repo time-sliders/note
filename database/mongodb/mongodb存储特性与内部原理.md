@@ -120,11 +120,9 @@ collection.createIndex(new Document("created",1),new IndexOptions().expireAfter(
 
 ​    **Replica set：**复制集，mongodb的架构方式之一 ，通常是三个对等的节点构成一个“复制集”集群，有“primary”和secondary等多中角色（稍后详细介绍），其中primary负责读写请求，secondary可以负责读请求，这有配置决定，其中secondary紧跟primary并应用write操作；如果primay失效，则集群进行“多数派”选举，选举出新的primary，即failover机制，即HA架构。复制集解决了单点故障问题，也是mongodb垂直扩展的最小部署单位，当然sharding cluster中每个shard节点也可以使用Replica set提高数据可用性。 
 
-​    **Sharding cluster：**分片集群，数据水平扩展的手段之一；replica set这种架构的缺点就是“集群数据容量”受限于单个节点的磁盘大小，如果数据量不断增加，对它进行扩容将时非常苦难的事情，所以我们需要采用Sharding模式来解决这个问题。将整个collection的数据将根据sharding key被sharding到多个mongod节点上，即每个节点持有collection的一部分数据，这个集群持有全部数据，原则上sharding可以支撑数TB的数据。
+​    **Sharding cluster：<u>分片集群，数据水平扩展的手段之一</u>；replica set这种架构的缺点就是“集群数据容量”受限于单个节点的磁盘大小，如果数据量不断增加，对它进行扩容将时非常苦难的事情，所以我们需要采用Sharding模式来解决这个问题。将整个collection的数据将根据sharding key被sharding到多个mongod节点上，即每个节点持有collection的一部分数据，这个集群持有全部数据，原则上sharding可以支撑数TB的数据。**
 
- 
-
-​    **系统配置：**1）建议mongodb部署在linux系统上，较高版本，选择合适的底层文件系统（ext4），开启合适的swap空间  2）无论是MMAPV1或者wiredTiger引擎，较大的内存总能带来直接收益。3）对数据存储文件关闭“atime”（文件每次access都会更改这个时间值，表示文件最近被访问的时间），可以提升文件访问效率。 4）ulimit参数调整，这个在基于网络IO或者磁盘IO操作的应用中，通常都会调整，上调系统允许打开的文件个数（ulimit -n 65535）。
+​     **系统配置：**1）建议mongodb部署在linux系统上，较高版本，选择合适的底层文件系统（ext4），开启合适的swap空间  2）无论是MMAPV1或者wiredTiger引擎，较大的内存总能带来直接收益。3）对数据存储文件关闭“atime”（文件每次access都会更改这个时间值，表示文件最近被访问的时间），可以提升文件访问效率。 4）ulimit参数调整，这个在基于网络IO或者磁盘IO操作的应用中，通常都会调整，上调系统允许打开的文件个数（ulimit -n 65535）。
 
  
 

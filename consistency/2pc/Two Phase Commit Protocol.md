@@ -1,3 +1,34 @@
+**两个阶段的执行**
+
+1.请求阶段（commit-request phase，或称表决阶段，voting phase）
+在请求阶段，**协调者**将通知**事务参与者**准备提交或取消事务，然后进入表决过程。
+在表决过程中，参与者将告知协调者自己的决策：同意（事务参与者本地作业执行成功）或取消（本地作业执行故障）。
+
+2.提交阶段（commit phase）
+在该阶段，协调者将基于第一个阶段的投票结果进行决策：提交或取消。
+当且仅当所有的参与者同意提交事务协调者才通知所有的参与者提交事务，否则协调者将通知所有的参与者取消事务。
+参与者在接收到协调者发来的消息后将执行响应的操作。
+
+**两阶段提交的缺点**
+
+1.**同步阻塞问题**。执行过程中，所有参与节点都是事务阻塞型的。
+当参与者占有公共资源时，其他第三方节点访问公共资源不得不处于阻塞状态。
+
+2.**单点故障**。由于协调者的重要性，一旦协调者发生故障。
+参与者会一直阻塞下去。尤其在第二阶段，协调者发生故障，那么所有的参与者还都处于锁定事务资源的状态中，而无法继续完成事务操作。（如果是协调者挂掉，可以重新选举一个协调者，但是无法解决因为协调者宕机导致的参与者处于阻塞状态的问题）
+
+3.**数据不一致**。在二阶段提交的阶段二中，当协调者向参与者发送commit请求之后，发生了局部网络异常或者在发送commit请求过程中协调者发生了故障，这回导致只有一部分参与者接受到了commit请求。
+而在这部分参与者接到commit请求之后就会执行commit操作。但是其他部分未接到commit请求的机器则无法执行事务提交。于是整个分布式系统便出现了数据不一致性的现象。
+
+**两阶段提交无法解决的问题**
+
+当协调者出错，同时参与者也出错时，两阶段无法保证事务执行的完整性。
+考虑协调者再发出commit消息之后宕机，而唯一接收到这条消息的参与者同时也宕机了。
+那么即使协调者通过选举协议产生了新的协调者，这条事务的状态也是不确定的，没人知道事务是否被已经提交。
+
+***
+
+
 In [transaction processing](https://en.wikipedia.org/wiki/Transaction_processing), [databases](https://en.wikipedia.org/wiki/Database), and [computer networking](https://en.wikipedia.org/wiki/Computer_networking), the **two-phase commit protocol** (**2PC**) is a type of [atomic commitment protocol](https://en.wikipedia.org/wiki/Atomic_commit) (ACP). It is a [distributed algorithm](https://en.wikipedia.org/wiki/Distributed_algorithm) that coordinates all the processes that participate in a [distributed atomic transaction](https://en.wikipedia.org/wiki/Distributed_transaction) on whether to *commit* or *abort* (*roll back*) the transaction (it is a specialized type of [consensus](https://en.wikipedia.org/wiki/Consensus_(computer_science)) protocol). The protocol achieves its goal even in many cases of temporary system failure (involving either process, network node, communication, etc. failures), and is thus widely used.[[1\]](https://en.wikipedia.org/wiki/Two-phase_commit_protocol#cite_note-bernstein1987-1)[[2\]](https://en.wikipedia.org/wiki/Two-phase_commit_protocol#cite_note-weikum2001-2)[[3\]](https://en.wikipedia.org/wiki/Two-phase_commit_protocol#cite_note-Bern2009-3) However, it is not resilient to all possible failure configurations, and in rare cases, manual intervention is needed to remedy an outcome. To accommodate recovery from failure (automatic in most cases) the protocol's participants use [logging](https://en.wikipedia.org/wiki/Server_log) of the protocol's states. Log records, which are typically slow to generate but survive failures, are used by the protocol's [recovery procedures](https://en.wikipedia.org/wiki/Recovery_procedure). Many protocol variants exist that primarily differ in logging strategies and recovery mechanisms. Though usually intended to be used infrequently, recovery procedures compose a substantial portion of the protocol, due to many possible failure scenarios to be considered and supported by the protocol.
 
 In a "normal execution" of any single [distributed transaction](https://en.wikipedia.org/wiki/Distributed_transaction) ( i.e., when no failure occurs, which is typically the most frequent situation), the protocol consists of two phases:
@@ -60,7 +91,7 @@ An * next to the record type means that the record is forced to stable storage.[
 
 ## Disadvantages
 
-The greatest disadvantage of the two-phase commit protocol is that it is a blocking protocol. If the coordinator fails permanently, some participants will never resolve their transactions: After a participant has sent an **agreement** message to the coordinator, it will block until a **commit** or **rollback** is received.
+The greatest disadvantage of the two-phase commit protocol is that **it is a blocking protocol**. **If the coordinator fails permanently, some participants will never resolve their transactions: After a participant has sent an agreement message to the coordinator, it will block until a commit or rollback is received.**
 
 ## Implementing the two-phase commit protocol
 
