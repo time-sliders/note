@@ -21,9 +21,6 @@ protected void setupRequestProcessors() {
     setupContainerManager();
 }
 ```
-
-
-
 # LeaderRequestProcessor
 
 第一个消息服务器处理器预消息服务器 LeaderRequestProcessor
